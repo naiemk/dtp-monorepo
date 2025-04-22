@@ -1,0 +1,24 @@
+---
+description: Core functionalities to define types, and manage the routingkj
+globs: 
+---
+
+# admin types
+- owner (sets admins)
+- system admin (highest privilage)
+- trust admin (manage trust)
+- general admin (manage generic admin tasks)
+
+# managing model namespaces
+A model namespace can hold a group of models of the same type, and API, arbitrary grouping
+- list model namespaces
+- Register a new system model (only admin)
+- Register a new model namespace (by the node-manager using the node-manager namespace)
+
+# managing trust namespaces
+A node can work for different trust namespaces. Each trust namespace can be managed by their custom manager
+- list trust namespaces
+- delete a trust namespace (only trust admin) 
+- Register a new authored trust namespace (must have a min stake), prefix: trust.authored.
+- Register a new special authored trust namespace (reserved for big orgs and govs, by only system admin), prefix: trust.verified.
+- Register a new dtp trust mangager, prefix: trust.dtp. (only trust admin)

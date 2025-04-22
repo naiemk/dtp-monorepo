@@ -1,0 +1,19 @@
+---
+description: The node subsystem
+globs: 
+---
+
+# Managing nodes
+
+## Node functionalities
+- Stake a minimum amount and assign a worker for the node?
+- Register a node (node_id, node namespaces, namesapce owner signatures) [only staker]
+- update node (add / remove namespaces, add / remove models served)
+- activate / deactivate node
+- set models to serve (model namespace, id, request price / byte, response price / byte)
+
+## Score management
+- node scores (reponse rate, valid answer rate, complain rate)
+
+## Node seletion algorithm
+- A deterministic node-selection for each model namespace, and quality filter, and pricing

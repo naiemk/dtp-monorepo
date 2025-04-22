@@ -1,0 +1,12 @@
+---
+description: Session management subsystem
+globs: 
+---
+
+# Sessions
+
+Sessions are one of the core concepts. The session subsystem has the following features:
+- Create session by sending X amount of session token (e.g. USDT) to the session manager. Produces a session ID
+- Charge session (when the nodes serving requests, or the use cal call to get their funds)
+- Close session (session owner can call to close the session and get rewards)
+

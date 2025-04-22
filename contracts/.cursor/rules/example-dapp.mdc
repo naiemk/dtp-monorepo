@@ -1,0 +1,66 @@
+---
+description: Example dApp
+globs: 
+---
+# Example dapp
+
+This is not full code. Just a bit of rough psuedo-code for INSPIRATION not exact design
+
+```solidity
+contract NftBuilder extends WithDtnAi {
+  bytes32 session_id;
+  function initialize() external {
+    IERC20(ai.feeToken()).transfer(ai.feeTarget(), 100 * 10**18); // Pay 100 USDT
+    session_id = ai.start_session()
+  }
+
+  function mintNft() external payable {
+    // ai_call is the api call. The format is published by the ai_node
+    // or can be read from the ai_core by the developer
+    bytes32 model_id = keccack("openai-dall-e-3")
+    bytes memory ai_call = abi.encode("createImage", "Create a random image for an nft reflecting Deep Trust Network", "640x640")
+    CallBack memory callback = ai.callback(address(this), NftBuilder.jsonFromImage)
+    bytes32 requestId = ai.request(
+      session_id,
+      [], // No special namespaces
+      model_id,
+      DtnDefaults.ROUTING_SYSTEM_VALIDATED_ANY, // A common default routing
+      DtnAi.DtnRequest({ call: ai_call, calltype: DtnAi.CallType.IPFS })
+      callback,
+      msg.sender, // beneficiary
+      10_000 gwei // maximum_gas
+    ){value: msg.value}
+    emit RequestSent(requestId);
+  }
+
+  function jsonFromImage(bytes32 requestId, uint8 resultType) external payable only_dtn {
+    if (resultType == DtnAi.Result.SUCCESS) {
+      (,,bytes32 ipfs_cid) = ai.fetch_response()
+      bytes32 model_id = keccack("openai-o4-mini")
+      bytes memory ai_call = abi.encode("text_call",
+        "Create a JSON for NFT standard type from given <id>. <id> is an IPFS cid: {0}", // {0} will be replaced with the first param
+        "bytes32", // This is the list of types
+        abi.encode(ipfs_cid));
+      CallBack memory callback = ai.callback(address(this), NftBuilder.nftFromJson)
+      bytes32 requestId = ai.request(
+        session_id,
+        [], // No special namespaces
+        model_id,
+        DtnDefaults.ROUTING_SYSTEM_VALIDATED_ANY, // A common default routing
+        DtnAi.DtnRequest({ call: ai_call, calltype: DtnAi.CallType.IPFS })
+        callback,
+        msg.sender, // beneficiary
+        5_000 gwei // maximum_gas
+      );
+      emit RequestSent(requestId);
+    }
+  }
+
+  function nftFromJson(bytes32 requestId, uint8 resultType) external payable only_dtn {
+    if (resultType == DtnAi.Result.SUCCESS) {
+      (,,bytes32 json_ipfs_cid) = ai.fetch_response()
+      createNftForURL(..., json_ipfs_cid)
+    }
+  }
+}
+```

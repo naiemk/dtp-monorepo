@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+---
+Scope: * (files)
+
+- Use TypeScript and Solidity for all development.
+- Prioritize readability and maintainability in all code.
+- Ensure function and variable names are clear and descriptive.
+- Use concise, meaningful comments for complex logic.
+- Apply minimal comments documenting to all functions.

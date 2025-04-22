@@ -1,0 +1,9 @@
+---
+description: Core concepts used in the design
+globs: 
+---
+
+# Core concepts
+
+- namespace: We use namespace for matching requests with services. They are mapped to a 32-byte hash, os can not be recursive despite the looks. namespace is very general concept and can apply to difference contexes, e.g. storing model info, or security. Some examples; models.system.openai.gpt4o, trust.authored.system-authority, trust.dtn.score.8+, model.johnsmith.my-llamma3, trust.authored.gov.ae
+

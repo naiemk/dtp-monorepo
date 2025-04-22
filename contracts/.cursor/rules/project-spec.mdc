@@ -1,0 +1,16 @@
+---
+description: Specifications for the project architecture and details
+globs: 
+---
+
+# Project specifications
+
+We are building smart contracts for DeepTrust Network (DTN). DTN is divided in to the following sub-systems. Each will have its own set of SCs, and there is a core sub-system to connect all parts together:
+
+- The node subsytem: @subsystem-node : Main node management functionalities
+- The model subsystem: @subsystem-model : Main model management functionalities
+- The session subsystem: @subsystem-session : Main session management functionalities
+- The dapp subsystem @subsystem-dapp : Main interface for dapps to use models
+- The core subsystem @subsystem-core : Contains data types and interfaces for all other subsystems
+
+Note: all solidity contracts must be upgradeable using UUPSUpgreable pattern

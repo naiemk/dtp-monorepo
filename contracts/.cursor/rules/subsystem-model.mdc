@@ -1,0 +1,10 @@
+---
+description: Model subsystem
+globs: 
+---
+
+# Model management system
+- Register model namespace (group of models with the same api)
+- Register model API (model_namespace, api, docs)
+- Register a new model (based on the node namespace, or system namespace for common models)
+- get model ID

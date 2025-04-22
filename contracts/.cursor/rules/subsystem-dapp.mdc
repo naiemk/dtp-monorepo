@@ -1,0 +1,52 @@
+---
+description: dApp interface to DTPG
+globs: 
+---
+
+# dApps subsystem
+dapps (smart contracts) will produce AI requests and receive callbacks for the replies. They also need to pay for their request execution. We have the following concepts:
+
+@core-concepts
+
+## Routing config
+Routing has two steps: 1- finding the nodes to serve the request, 2- aggregating the results
+A routing config will tell the core how we expect it to serve the request. We need to build sensible defaults for 0 config
+- trust namespaces: list of trust namespaces that are allowed to serve us
+- aggregation type: SELECT_BEST, ALL, ANY, VOTE (for boolean), RANK (for multi-choice)
+- min-confifence: 0-10 (default 8)
+
+## Callback
+AI requests will be responded with callbacks:
+- After AI nodes produce results, and the result is aggregated, it will be stored using request_id
+- Core will call callback (success / failed) giving the request ID
+- At the end extra fee will be refunded to beneficiary
+- Result type: Direct, IPFS
+- Result encoding: Binary, utf-8, json
+- If result-type is IPFS, the uid will be stored as result
+- AI calls can be chained using callbacks. HDFS results are suitable for chaining
+- request: (response_contract, success_callback, failure_callback)
+
+## Interface
+Smart contracts can use the interface of the core to query AI nodes.
+- to call a request:
+request_ai(
+  session_id,
+  namespaces, // IDs of namespaces for nodes that can serve this req
+  model_id, // model_id to serve
+  routing, // Routing config
+  request, // encoded call
+  callback, // The callback config
+  beneficiary, // Who should get the refund 
+  max_fee, // maximum fee to pay to the AI node for this query
+  { value: xx } // Include the gas enough for running the request, and callback
+) => returns (request_id: bytes32)
+- to fetch the results:
+fetch_response(request_id) => (encoding, data, ipfs_cid)
+fetch_error(request_id) => (code, message)
+
+## Fee structure
+dApps need to pay two type of fees:
+a- gas fee; this is the gas fee passed to the AI nodes so that they can register the resuts
+b- AI API payments; amount locked at the start of session. It will be reduced after requests based on input/output size and the price
+
+@example-dapp
