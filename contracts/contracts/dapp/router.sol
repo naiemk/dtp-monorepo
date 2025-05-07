@@ -3,12 +3,13 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "../model/model-manager.sol";
+import "../core/trust.sol";
 
 /**
  * @title Router
  * @notice Router is the interface for dApps
  */
-contract RouterUpgradeable is Initializable, ModelManagerUpgradeable {
+contract RouterUpgradeable is Initializable, ModelManagerUpgradeable, TrustManagerUpgradeable {
     /// @custom:storage-location erc7201:dtn.storage.router.001
     struct RouterStorageV001 {
         // No additional storage needed - using ModelManager's storage
@@ -22,9 +23,16 @@ contract RouterUpgradeable is Initializable, ModelManagerUpgradeable {
         _disableInitializers();
     }
 
-    function initialize() public initializer {
+    function initialize(uint256 minAuthoredStake) public initializer {
         __ModelManager_init();
+        __TrustManager_init(minAuthoredStake);
         __Router_init_unchained();
+        
+        // Setup initial roles
+        _setupRole(Dtn.OWNER_ROLE, msg.sender);
+        _setRoleAdmin(Dtn.SYSTEM_ADMIN_ROLE, Dtn.OWNER_ROLE);
+        _setRoleAdmin(Dtn.TRUST_ADMIN_ROLE, Dtn.SYSTEM_ADMIN_ROLE);
+        _setRoleAdmin(Dtn.GENERAL_ADMIN_ROLE, Dtn.SYSTEM_ADMIN_ROLE);
     }
 
     function __Router_init_unchained() internal onlyInitializing {
