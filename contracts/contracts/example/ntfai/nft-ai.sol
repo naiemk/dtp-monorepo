@@ -1,0 +1,264 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "../../utils/with-dtn-ai.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721BurnableUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+
+/**
+ * @title NftAi
+ * @notice NftAi is an example project to use DtnAi to create an nft
+ * First we ask AI to create an image based on a prompt
+ * Then we ask AI to create nft metadata based on the image
+ * Then we mint an nft with the metadata
+ */
+
+// Add this struct definition if it's not already defined in WithDtnAi
+struct CallBack {
+    address target;
+    bytes4 success;
+    bytes4 failure;
+}
+
+contract NftAi is
+    WithDtnAi,
+    OwnableUpgradeable,
+    ERC721URIStorageUpgradeable,
+    ERC721BurnableUpgradeable,
+    ERC721EnumerableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable {
+    uint256 public constant CREATE_IMAGE_CALLBACK_GAS = 10_000;
+    uint256 public constant CREATE_METADATA_CALLBACK_GAS = 10_000;
+    uint256 public sessionId;
+    uint256 public minPrice;
+    string public createImagePrompt;
+    string public createNftMetadataPrompt;
+    mapping(bytes32 => address) public requestIdToNftOwner;
+
+    // Rate limiting
+    uint256 public constant RATE_LIMIT_INTERVAL = 1 hours;
+    uint256 public constant MAX_PURCHASES_PER_INTERVAL = 5;
+    mapping(address => uint256) public lastPurchaseTime;
+    mapping(address => uint256) public purchasesInInterval;
+
+    // Events
+    event RequestSent(bytes32 indexed requestId);
+    event AiError(bytes32 indexed requestId);
+    event NFTMinted(
+        address indexed to,
+        uint256 indexed tokenId,
+        string prompt,
+        string imageUri
+    );
+    event MinPriceUpdated(uint256 newPrice);
+    event PurchaseAttempted(address indexed buyer, string prompt, uint256 value);
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address router, uint256 _minPrice) public initializer {
+        __ERC721_init("AI Generated NFT", "AINFT");
+        __ERC721Enumerable_init();
+        __ERC721URIStorage_init();
+        __ERC721Burnable_init();
+        __Ownable_init();
+        __ReentrancyGuard_init();
+        __Pausable_init();
+        
+        WithDtnAi.init(router);
+        minPrice = _minPrice;
+    }
+
+    function setPrompts(string memory _createImagePrompt, string memory _createNftPrompt) external onlyOwner {
+        createImagePrompt = _createImagePrompt;
+        createNftMetadataPrompt = _createNftPrompt;
+    }
+
+    function startSession(uint256 amount) external onlyOwner {
+        // No need to transfer tokens here as it's handled in startUserSession
+        sessionId = ai.startUserSession(amount);
+    }
+
+    function closeSession() external onlyOwner {
+        require(sessionId != 0, "No active session");
+        ai.closeUserSession(sessionId);
+        sessionId = 0;
+    }
+
+    function setMinPrice(uint256 _minPrice) external onlyOwner {
+        minPrice = _minPrice;
+        emit MinPriceUpdated(_minPrice);
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function purchaseNft(string memory userSubPrompt) external payable 
+        nonReentrant 
+        whenNotPaused 
+    {
+        // Input validation
+        require(bytes(userSubPrompt).length > 0, "Empty prompt not allowed");
+        require(bytes(userSubPrompt).length <= 1000, "Prompt too long");
+        require(sessionId != 0, "No active session");
+        require(msg.value >= minPrice, "Insufficient price");
+
+        emit PurchaseAttempted(msg.sender, userSubPrompt, msg.value);
+
+        // Create a request to create image from an ai model
+        bytes32 modelId = ai.modelId("system.models.openai.dall-e-3");
+        bytes memory aiCall = abi.encode("createImage",
+            "640x640",
+            createImagePrompt,
+            "string",
+            abi.encode(userSubPrompt)
+        );
+        CallBack memory callback = CallBack(
+            address(this),
+            this.createNftMetadataFromImage.selector,
+            this.aiError.selector
+        );
+        bytes32 requestId = ai.request(
+            sessionId,
+            [],
+            modelId,
+            DtnDefaults.defaultRoutingSystemValidatedAny(),
+            DtnAi.DtnRequest({ call: aiCall, calltype: DtnAi.CallType.IPFS }),
+            callback,
+            msg.sender,
+            CREATE_IMAGE_CALLBACK_GAS
+        ){value: CREATE_IMAGE_CALLBACK_GAS};
+        
+        emit RequestSent(requestId);
+        requestIdToNftOwner[requestId] = msg.sender;
+    }
+
+    function createNftMetadataFromImage(bytes32 requestId) external onlyDtn {
+        // Given the ipfs cid, create nft metadata using AI
+        (,,string memory ipfsCid) = ai.fetch_response();
+        bytes32 modelId = ai.modelId("system.models.openai.gpt-4o");
+        bytes memory aiCall = abi.encode("text",
+            createNftMetadataPrompt,
+            "string",
+            abi.encode(ipfsCid));
+        CallBack memory callback = CallBack(
+            address(this),
+            this.mintNf.selector,
+            this.aiError.selector
+        );
+        bytes32 nextRequestId = ai.request(
+            sessionId,
+            [], // No special namespaces
+            modelId,
+            DtnDefaults.defaultRoutingSystemValidatedAny(),
+            DtnAi.DtnRequest({ call: aiCall, calltype: DtnAi.CallType.IPFS }),
+            callback,
+            msg.sender,
+            CREATE_METADATA_CALLBACK_GAS
+        ){value: CREATE_METADATA_CALLBACK_GAS};
+        emit RequestSent(nextRequestId);
+        requestIdToNftOwner[nextRequestId] = requestIdToNftOwner[requestId];
+    }
+
+    function mintNf(bytes32 requestId) external onlyDtn {
+        // Given the nft metadata, mint an nft
+        (,,string memory ipfsCid) = ai.fetch_response();
+        mintTokenFromJson(requestIdToNftOwner[requestId], ipfsCid);
+    }
+
+    function aiError(bytes32 requestId) external onlyDtn {
+        // Handle ai error
+        // TODO: Implement error handling
+        emit AiError(requestId);
+    }
+
+    function mintTokenFromJson(
+        address to,
+        string memory ipfsCid
+    ) internal
+    {
+        uint256 newTokenId = totalSupply() + 1;
+        _safeMint(to, newTokenId);
+        _setTokenURI(newTokenId, string.concat("ipfs://", ipfsCid));
+    }
+
+    function mintWithAI(
+        string memory prompt,
+        address to,
+        uint256 tokenId
+    ) public payable {
+        // Check if payment amount is correct
+        require(msg.value >= minPrice, "Insufficient payment");
+        
+        // Ensure token ID hasn't been minted yet
+        require(!_exists(tokenId), "Token already exists");
+        
+        // Generate AI content based on prompt
+        string memory imageUri = generateAIContent(prompt);
+        
+        // Mint the NFT
+        _safeMint(to, tokenId);
+        
+        // Set the token URI with AI-generated content
+        _setTokenURI(tokenId, imageUri);
+        
+        // Store prompt for future reference
+        tokenPrompts[tokenId] = prompt;
+        
+        // Emit minting event
+        emit NFTMinted(to, tokenId, prompt, imageUri);
+    }
+
+    function generateAIContent(string memory prompt) internal returns (string memory) {
+        // This function would integrate with your AI service
+        // For now, return a placeholder URI
+        // In a real implementation, this would call an oracle or external service
+        return string(abi.encodePacked("ipfs://ai-generated-content/", prompt));
+    }
+
+    // Mapping to store prompts for each token
+    mapping(uint256 => string) public tokenPrompts;
+
+    // Add withdrawal function for contract owner
+    function withdrawFunds() external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds to withdraw");
+        (bool success, ) = payable(owner()).call{value: balance}("");
+        require(success, "Transfer failed");
+    }
+
+    // Override required functions for compatibility
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 tokenId,
+        uint256 batchSize
+    ) internal virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+    }
+
+    function _burn(uint256 tokenId) internal virtual override(ERC721Upgradeable, ERC721URIStorageUpgradeable) {
+        super._burn(tokenId);
+    }
+
+    function tokenURI(uint256 tokenId) public view virtual override(ERC721Upgradeable, ERC721URIStorageUpgradeable) returns (string memory) {
+        return super.tokenURI(tokenId);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
+}
