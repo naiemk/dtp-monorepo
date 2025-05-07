@@ -9,6 +9,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721Burnab
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "../../model/imodel-manager.sol";
 
 /**
  * @title NftAi
@@ -59,12 +60,18 @@ contract NftAi is
     event MinPriceUpdated(uint256 newPrice);
     event PurchaseAttempted(address indexed buyer, string prompt, uint256 value);
 
+    IModelManager public modelManager;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address router, uint256 _minPrice) public initializer {
+    function initialize(
+        address router, 
+        address _modelManager,
+        uint256 _minPrice
+    ) public initializer {
         __ERC721_init("AI Generated NFT", "AINFT");
         __ERC721Enumerable_init();
         __ERC721URIStorage_init();
@@ -74,6 +81,7 @@ contract NftAi is
         __Pausable_init();
         
         WithDtnAi.init(router);
+        modelManager = IModelManager(_modelManager);
         minPrice = _minPrice;
     }
 
@@ -118,23 +126,27 @@ contract NftAi is
 
         emit PurchaseAttempted(msg.sender, userSubPrompt, msg.value);
 
-        // Create a request to create image from an ai model
-        bytes32 modelId = ai.modelId("system.models.openai.dall-e-3");
-        bytes memory aiCall = abi.encode("createImage",
+        // Get model ID from model manager
+        bytes32 imageModelId = modelManager.modelId("system.models.openai.dall-e-3");
+        
+        bytes memory aiCall = abi.encode(
+            "createImage",
             "640x640",
             createImagePrompt,
             "string",
             abi.encode(userSubPrompt)
         );
+
         CallBack memory callback = CallBack(
             address(this),
             this.createNftMetadataFromImage.selector,
             this.aiError.selector
         );
+
         bytes32 requestId = ai.request(
             sessionId,
             [],
-            modelId,
+            imageModelId,
             DtnDefaults.defaultRoutingSystemValidatedAny(),
             DtnAi.DtnRequest({ call: aiCall, calltype: DtnAi.CallType.IPFS }),
             callback,
@@ -147,33 +159,40 @@ contract NftAi is
     }
 
     function createNftMetadataFromImage(bytes32 requestId) external onlyDtn {
-        // Given the ipfs cid, create nft metadata using AI
         (,,string memory ipfsCid) = ai.fetch_response();
-        bytes32 modelId = ai.modelId("system.models.openai.gpt-4o");
-        bytes memory aiCall = abi.encode("text",
+        
+        // Get model ID from model manager
+        bytes32 metadataModelId = modelManager.modelId("system.models.openai.gpt-4");
+        
+        bytes memory aiCall = abi.encode(
+            "text",
             createNftMetadataPrompt,
             "string",
-            abi.encode(ipfsCid));
+            abi.encode(ipfsCid)
+        );
+
         CallBack memory callback = CallBack(
             address(this),
-            this.mintNf.selector,
+            this.mintNft.selector,
             this.aiError.selector
         );
+
         bytes32 nextRequestId = ai.request(
             sessionId,
-            [], // No special namespaces
-            modelId,
+            [],
+            metadataModelId,
             DtnDefaults.defaultRoutingSystemValidatedAny(),
             DtnAi.DtnRequest({ call: aiCall, calltype: DtnAi.CallType.IPFS }),
             callback,
             msg.sender,
             CREATE_METADATA_CALLBACK_GAS
         ){value: CREATE_METADATA_CALLBACK_GAS};
+
         emit RequestSent(nextRequestId);
         requestIdToNftOwner[nextRequestId] = requestIdToNftOwner[requestId];
     }
 
-    function mintNf(bytes32 requestId) external onlyDtn {
+    function mintNft(bytes32 requestId) external onlyDtn {
         // Given the nft metadata, mint an nft
         (,,string memory ipfsCid) = ai.fetch_response();
         mintTokenFromJson(requestIdToNftOwner[requestId], ipfsCid);
