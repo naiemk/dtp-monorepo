@@ -12,12 +12,13 @@ import "./dtn.sol";
 contract TrustManagerUpgradeable is Initializable, AccessControlUpgradeable {
     /// @custom:storage-location erc7201:dtn.storage.trust.001
     struct TrustStorageV001 {
-        mapping(string => Dtn.TrustNamespace) trustNamespaces;
+        mapping(bytes32 => Dtn.TrustNamespace) trustNamespaces;
         uint256 minAuthoredStake;
         string[] namespaceList;
     }
 
-    bytes32 private constant TrustStorageV001Location = 0x...; // Calculate proper storage location
+        // keccak256(abi.encode(uint256(keccak256("dtn.storage.trust.001")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant TrustStorageV001Location = 0xad4fe8e5c0444567eeb89b13bf7f7573d4552b43fd078ed93e20764d22767d00; // Calculate proper storage location
 
     event TrustNamespaceRegistered(string namespace, address owner, string namespaceType);
     event TrustNamespaceDeleted(string namespace);
@@ -32,65 +33,68 @@ contract TrustManagerUpgradeable is Initializable, AccessControlUpgradeable {
         $.minAuthoredStake = _minAuthoredStake;
     }
 
-    function registerAuthoredTrustNamespace(string memory namespace) external payable {
+    function registerAuthoredTrustNamespace(string memory namespace, address nodeSelector) external payable {
         TrustStorageV001 storage $ = getTrustStorageV001();
-        require(Dtn.isAuthoredNamespace(namespace), "Invalid authored namespace prefix");
         require(msg.value >= $.minAuthoredStake, "Insufficient stake");
+        require(Dtn.isAuthoredNamespace(namespace), "Invalid authored namespace prefix");
         
-        $.trustNamespaces[namespace] = Dtn.TrustNamespace({
+        $.trustNamespaces[keccak256(abi.encode(namespace))] = Dtn.TrustNamespace({
             owner: msg.sender,
             stake: msg.value,
             isActive: true,
-            namespaceType: "authored"
+            namespacePrefix: Dtn.TRUST_AUTHORED_PREFIX,
+            nodeSelector: nodeSelector
         });
         $.namespaceList.push(namespace);
         
-        emit TrustNamespaceRegistered(namespace, msg.sender, "authored");
+        emit TrustNamespaceRegistered(namespace, msg.sender, Dtn.TRUST_AUTHORED_PREFIX);
     }
 
-    function registerVerifiedTrustNamespace(string memory namespace, address owner) external {
+    function registerVerifiedTrustNamespace(string memory namespace, address owner, address nodeSelector) external {
         require(hasRole(Dtn.SYSTEM_ADMIN_ROLE, msg.sender), "Caller is not system admin");
         require(Dtn.isVerifiedNamespace(namespace), "Invalid verified namespace prefix");
         
         TrustStorageV001 storage $ = getTrustStorageV001();
-        $.trustNamespaces[namespace] = Dtn.TrustNamespace({
+        $.trustNamespaces[keccak256(abi.encode(namespace))] = Dtn.TrustNamespace({
             owner: owner,
             stake: 0,
             isActive: true,
-            namespaceType: "verified"
+            namespacePrefix: Dtn.TRUST_VERIFIED_PREFIX,
+            nodeSelector: nodeSelector
         });
         $.namespaceList.push(namespace);
         
-        emit TrustNamespaceRegistered(namespace, owner, "verified");
+        emit TrustNamespaceRegistered(namespace, owner, Dtn.TRUST_VERIFIED_PREFIX);
     }
 
-    function registerDtpTrustNamespace(string memory namespace, address owner) external {
+    function registerDtnTrustNamespace(string memory namespace, address owner, address nodeSelector) external {
         require(hasRole(Dtn.TRUST_ADMIN_ROLE, msg.sender), "Caller is not trust admin");
-        require(Dtn.isDtpNamespace(namespace), "Invalid DTP namespace prefix");
+        require(Dtn.isDtnNamespace(namespace), "Invalid DTP namespace prefix");
         
         TrustStorageV001 storage $ = getTrustStorageV001();
-        $.trustNamespaces[namespace] = Dtn.TrustNamespace({
+        $.trustNamespaces[keccak256(abi.encode(namespace))] = Dtn.TrustNamespace({
             owner: owner,
             stake: 0,
             isActive: true,
-            namespaceType: "dtp"
+            namespacePrefix: Dtn.TRUST_DTP_PREFIX,
+            nodeSelector: nodeSelector
         });
         $.namespaceList.push(namespace);
         
-        emit TrustNamespaceRegistered(namespace, owner, "dtp");
+        emit TrustNamespaceRegistered(namespace, owner, Dtn.TRUST_DTP_PREFIX);
     }
 
     function deleteTrustNamespace(string memory namespace) external {
         require(hasRole(Dtn.TRUST_ADMIN_ROLE, msg.sender), "Caller is not trust admin");
         
         TrustStorageV001 storage $ = getTrustStorageV001();
-        require($.trustNamespaces[namespace].isActive, "Namespace not found or already deleted");
+        require($.trustNamespaces[keccak256(abi.encode(namespace))].isActive, "Namespace not found or already deleted");
         
-        $.trustNamespaces[namespace].isActive = false;
+        $.trustNamespaces[keccak256(abi.encode(namespace))].isActive = false;
         
         // If authored namespace, return stake to owner
         if (Dtn.isAuthoredNamespace(namespace)) {
-            payable($.trustNamespaces[namespace].owner).transfer($.trustNamespaces[namespace].stake);
+            payable($.trustNamespaces[keccak256(abi.encode(namespace))].owner).transfer($.trustNamespaces[keccak256(abi.encode(namespace))].stake);
         }
         
         emit TrustNamespaceDeleted(namespace);

@@ -12,7 +12,7 @@ import "../core/dtn.sol";
  * @title NodeManager
  * @notice Implementation of node management functionality for DeepTrust Network
  */
-contract NodeManagerUpgradeable is 
+abstract contract NodeManagerUpgradeable is 
     INodeManager,
     Initializable,
     UUPSUpgradeable,
@@ -23,12 +23,14 @@ contract NodeManagerUpgradeable is
     /// @custom:storage-location erc7201:dtn.storage.node.001
     struct NodeStorageV001 {
         mapping(bytes32 => Node) nodes;
-        mapping(bytes32 => ModelConfig[]) nodeModels;
+        mapping(bytes32 => bytes32[]) nodeModels;
+        mapping(bytes32 => ModelConfig) modelConfigs;
         uint256 minStakeAmount;
     }
 
-    bytes32 private constant NodeStorageV001Location = 
-        bytes32(uint256(keccak256("dtn.storage.node.001")) - 1) & ~bytes32(uint256(0xff));
+    // bytes32(uint256(keccak256("dtn.storage.node.001")) - 1) & ~bytes32(uint256(0xff));
+    bytes32 private constant NodeStorageV001Location =
+        0xf1d8a1fbd219fcf17256caa0b8a67d409449fa7722eca5860c9b170f56e73300;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -56,8 +58,8 @@ contract NodeManagerUpgradeable is
     function registerNode(
         bytes32 nodeId,
         address worker,
-        string[] calldata namespaces,
-        bytes[] calldata namespaceSignatures
+        string[] memory namespaces,
+        bytes[] memory namespaceSignatures
     ) external payable whenNotPaused nonReentrant {
         NodeStorageV001 storage $ = getNodeStorageV001();
         require(msg.value >= $.minStakeAmount, "Insufficient stake");
@@ -85,8 +87,8 @@ contract NodeManagerUpgradeable is
 
     function updateNodeNamespaces(
         bytes32 nodeId,
-        string[] calldata namespaces,
-        bytes[] calldata namespaceSignatures
+        string[] memory namespaces,
+        bytes[] memory namespaceSignatures
     ) external whenNotPaused {
         NodeStorageV001 storage $ = getNodeStorageV001();
         require($.nodes[nodeId].staker == msg.sender, "Not node staker");
@@ -109,11 +111,24 @@ contract NodeManagerUpgradeable is
         emit NodeStatusUpdated(nodeId, isActive);
     }
 
-    function setNodeModels(bytes32 nodeId, ModelConfig[] calldata models) external whenNotPaused {
+    function setNodeModels(bytes32 nodeId, ModelConfig[] memory models) external whenNotPaused {
         NodeStorageV001 storage $ = getNodeStorageV001();
         require($.nodes[nodeId].staker == msg.sender, "Not node staker");
         
-        $.nodeModels[nodeId] = models;
+        bytes32[] memory modelIds = new bytes32[](models.length);
+        
+        for (uint256 i = 0; i < models.length; i++) {
+            bytes32 modelId = keccak256(abi.encodePacked(
+                "models",
+                models[i].modelNamespaceId,
+                ".",
+                models[i].modelName
+            ));
+            modelIds[i] = modelId;
+            $.modelConfigs[modelId] = models[i];
+        }
+        
+        $.nodeModels[nodeId] = modelIds;
         emit NodeModelsUpdated(nodeId, models);
     }
 
@@ -141,7 +156,15 @@ contract NodeManagerUpgradeable is
     }
 
     function getNodeModels(bytes32 nodeId) external view returns (ModelConfig[] memory) {
-        return getNodeStorageV001().nodeModels[nodeId];
+        NodeStorageV001 storage $ = getNodeStorageV001();
+        bytes32[] memory modelIds = $.nodeModels[nodeId];
+        ModelConfig[] memory configs = new ModelConfig[](modelIds.length);
+        
+        for (uint256 i = 0; i < modelIds.length; i++) {
+            configs[i] = $.modelConfigs[modelIds[i]];
+        }
+        
+        return configs;
     }
 
     function selectNodes(
@@ -168,9 +191,5 @@ contract NodeManagerUpgradeable is
         // - Recover signer from signature
         // - Verify signer is authorized for namespace
         return true;
-    }
-
-    function _authorizeUpgrade(address newImplementation) internal override {
-        require(hasRole(Dtn.OWNER_ROLE, msg.sender), "Not authorized");
     }
 }

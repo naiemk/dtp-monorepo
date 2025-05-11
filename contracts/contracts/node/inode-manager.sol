@@ -24,8 +24,9 @@ interface INodeManager {
 
     /// @notice Struct to store model serving configuration
     struct ModelConfig {
-        bytes32 modelNamespace;
+        bytes32 modelNamespaceId; // The namespace id of the model group
         bytes32 modelId;
+        string modelName;
         uint256 requestPricePerByte;
         uint256 responsePricePerByte;
     }

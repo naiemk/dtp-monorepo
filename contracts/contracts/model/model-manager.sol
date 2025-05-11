@@ -97,11 +97,11 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable {
             revert InvalidModelName(modelName);
         }
 
-        bytes32 modelId = keccak256(abi.encodePacked(fullModelName));
-        $.modelIds[fullModelName] = modelId;
+        bytes32 _modelId = keccak256(abi.encodePacked(fullModelName));
+        $.modelIds[fullModelName] = _modelId;
 
-        emit ModelRegistered(namespace, modelName, modelId);
-        return modelId;
+        emit ModelRegistered(namespace, modelName, _modelId);
+        return _modelId;
     }
 
     function modelId(string memory modelName) external view override returns (bytes32) {

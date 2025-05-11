@@ -9,136 +9,24 @@ This guide provides step-by-step requirements for implementing the NftAi project
 
 ## Implementation Steps
 
-1. **Contract Dependencies Setup**
-Prompt: "Implement and configure the base contract dependencies with proper inheritance order:
-- Set up OpenZeppelin contracts (Ownable, ERC721Enumerable, ERC721URIStorage, ERC721Burnable)
-- Resolve multiple inheritance conflicts
-- Configure WithDtnAi integration
-- Add interface definitions if needed
+1- Implement V0.1 contracts
+Some basic logic for all sub-systems. Everything implemented under router
 
-2. **State Variables Correction**
-Prompt: "Review and correct all state variables in the contract:
-- Convert 'constant int' declarations to 'uint256 constant'
-- Add missing event declarations for state changes
-- Add comprehensive NatSpec documentation
-- Implement gas-efficient storage patterns
-- Add proper visibility modifiers"
+2- Add tests
+Have some tests around each sub-system
+Have an end-to-end integration test around nft-ai
 
-3. **Constructor Enhancement**
-Prompt: "Enhance the constructor with proper initialization:
-- Add ERC721 name and symbol initialization
-- Implement input validation for router address and minPrice
-- Add initialization event
-- Write NatSpec documentation
-- Implement proper inheritance constructor calls"
+3- Deploy and configure scripts
+Deploy and configure on testnet and mainnet
 
-4. **Session Management Implementation**
-Prompt: "Implement robust session management:
-- Create session state enum and tracking
-- Add session validation modifiers
-- Implement session events (start, update, end)
-- Add emergency session termination
-- Implement session-based access control
-- Add session timeout handling"
+4- Dummy node
+A dummy node implementation (e.g. Hello-world model) that is not really AI but implements all the features for testing
 
-5. **Purchase Flow Security**
-Prompt: "Implement secure NFT purchase flow:
-- Add comprehensive error handling
-- Create purchase events with indexed parameters
-- Add input validation for user prompts
-- Implement refund mechanism for failed transactions"
+5- End-to-end test
+Deploy one mainnet
+Launch dummy node
+Create AI-NFT using etherscan calls or a script
 
-6. **AI Integration Robustness**
-Prompt: "Strengthen the AI integration implementation:
-- Add request timeout handling
-- Implement retry mechanism for failed requests
-- Add fallback options for AI services
-- Implement response validation
-- Create comprehensive error handling
-- Add gas management for callbacks"
-
-7. **Metadata Management**
-Prompt: "Implement robust metadata handling:
-- Create metadata validation functions
-- Implement efficient storage pattern
-- Add metadata update capability
-- Add IPFS URI validation and handling
-- Implement metadata versioning
-- Add metadata retrieval functions"
-
-8. **Testing Suite**
-Prompt: "Create comprehensive test suite:
-- Write unit tests for all functions
-- Create integration tests for AI interaction
-- Implement gas optimization tests
-- Add security vulnerability tests
-- Create edge case test scenarios
-- Add fuzz testing"
-
-9. **Access Control Implementation**
-Prompt: "Implement granular access control:
-- Add OpenZeppelin AccessControl
-- Create admin role functions
-- Implement operator functionality
-- Add contract pause mechanism
-- Create emergency functions
-- Add role management functions"
-
-10. **Gas Optimization**
-Prompt: "Optimize contract for gas efficiency:
-- Implement packed storage patterns
-- Optimize function execution paths
-- Add batch operation support
-- Implement efficient memory usage
-- Replace string errors with custom errors
-- Optimize loop operations"
-
-11. **Events and Monitoring**
-Prompt: "Implement comprehensive event system:
-- Add events for all state changes
-- Implement indexed parameters
-- Add monitoring hooks
-- Create transaction tracking events
-- Add detailed error events"
-
-12. **Documentation**
-Prompt: "Create thorough documentation:
-- Write complete NatSpec comments
-- Create technical specifications
-- Add integration guides
-- Document security considerations
-- Create deployment procedures
-- Add maintenance guidelines"
-
-13. **Deployment Strategy**
-Prompt: "Design deployment process:
-- Create deployment scripts
-- Implement upgrade mechanism
-- Add deployment verification steps
-- Create maintenance procedures
-- Document emergency procedures
-- Add contract verification process"
-
-14. **Frontend Integration**
-Prompt: "Prepare contract for frontend integration:
-- Add view functions for state queries
-- Implement event filtering
-- Add pagination for token queries
-- Create TypeScript interfaces
-- Document API endpoints
-- Add multicall support"
-
-15. **Security Measures**
-Prompt: "Implement security features:
-- Add circuit breakers
-- Implement rate limiting
-- Add comprehensive input validation
-- Create access control checks
-- Add emergency stops
-- Implement slippage protection"
-
-## Usage
-Each step should be implemented sequentially. Use the prompts as guidelines when requesting AI assistance for implementation. Ensure each step is thoroughly tested before moving to the next.
-
-## Note
-This guide is iterative and should be updated as requirements evolve. Always follow the latest Solidity security best practices during implementation. 
+6- Documentation
+Developer documentation
+Node builder documentation

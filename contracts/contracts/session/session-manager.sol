@@ -41,11 +41,11 @@ contract SessionManagerUpgradeable is Initializable {
         _disableInitializers();
     }
 
-    function initialize() public initializer {
-        __SessionManager_init();
+    function initialize(address _feeToken, address _feeTarget) public virtual initializer {
+        __SessionManager_init(_feeToken, _feeTarget);
     }
 
-    function __SessionManager_init() internal onlyInitializing {
+    function __SessionManager_init(address _feeToken, address _feeTarget) internal onlyInitializing {
         SessionManagerStorageV001 storage $ = _getStorage();
         $.feeToken = _feeToken;
         $.feeTarget = _feeTarget;
@@ -57,7 +57,7 @@ contract SessionManagerUpgradeable is Initializable {
         }
     }
 
-    function startUserSession(uint amount) public virtual returns (uint) {
+    function _startUserSession(uint amount) internal virtual returns (uint) {
         if (amount == 0) revert InvalidAmount();
         SessionManagerStorageV001 storage $ = _getStorage();
         
@@ -67,7 +67,7 @@ contract SessionManagerUpgradeable is Initializable {
         return _startSession(msg.sender, amount);
     }
 
-    function closeUserSession(uint sessionId) public virtual {
+    function _closeUserSession(uint sessionId) internal virtual {
         Session memory session = getSessionById(sessionId);
         if (session.owner != msg.sender) revert Unauthorized(msg.sender, session.owner);
         uint remainingBalance = _closeSession(sessionId);

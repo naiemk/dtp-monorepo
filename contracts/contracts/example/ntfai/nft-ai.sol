@@ -7,9 +7,10 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721Enumer
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721BurnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "../../model/imodel-manager.sol";
+import "../../utils/dtn-defaults.sol";
 
 /**
  * @title NftAi
@@ -19,15 +20,8 @@ import "../../model/imodel-manager.sol";
  * Then we mint an nft with the metadata
  */
 
-// Add this struct definition if it's not already defined in WithDtnAi
-struct CallBack {
-    address target;
-    bytes4 success;
-    bytes4 failure;
-}
-
 contract NftAi is
-    WithDtnAi,
+    WithDtnAiUpgradeable,
     OwnableUpgradeable,
     ERC721URIStorageUpgradeable,
     ERC721BurnableUpgradeable,
@@ -79,25 +73,24 @@ contract NftAi is
         __Ownable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        
-        WithDtnAi.init(router);
+        __WithDtnAi_init(router);
         modelManager = IModelManager(_modelManager);
         minPrice = _minPrice;
     }
 
-    function setPrompts(string memory _createImagePrompt, string memory _createNftPrompt) external onlyOwner {
+    function setPrompts(string calldata _createImagePrompt, string calldata _createNftPrompt) external onlyOwner {
         createImagePrompt = _createImagePrompt;
         createNftMetadataPrompt = _createNftPrompt;
     }
 
     function startSession(uint256 amount) external onlyOwner {
         // No need to transfer tokens here as it's handled in startUserSession
-        sessionId = ai.startUserSession(amount);
+        sessionId = ai().startUserSession(amount);
     }
 
     function closeSession() external onlyOwner {
         require(sessionId != 0, "No active session");
-        ai.closeUserSession(sessionId);
+        ai().closeUserSession(sessionId);
         sessionId = 0;
     }
 
@@ -114,7 +107,7 @@ contract NftAi is
         _unpause();
     }
 
-    function purchaseNft(string memory userSubPrompt) external payable 
+    function purchaseNft(string calldata userSubPrompt) external payable 
         nonReentrant 
         whenNotPaused 
     {
@@ -137,29 +130,31 @@ contract NftAi is
             abi.encode(userSubPrompt)
         );
 
-        CallBack memory callback = CallBack(
+        IDtnAi.CallBack memory callback = IDtnAi.CallBack(
             address(this),
             this.createNftMetadataFromImage.selector,
             this.aiError.selector
         );
 
-        bytes32 requestId = ai.request(
+        IDtnAi.DtnRequest memory dtnRequest = IDtnAi.DtnRequest({
+            call: aiCall,
+            calltype: IDtnAi.CallType.IPFS
+        });
+        bytes32 requestId = ai().request{value: CREATE_IMAGE_CALLBACK_GAS}(
             sessionId,
-            [],
             imageModelId,
             DtnDefaults.defaultRoutingSystemValidatedAny(),
-            DtnAi.DtnRequest({ call: aiCall, calltype: DtnAi.CallType.IPFS }),
+            dtnRequest,
             callback,
             msg.sender,
-            CREATE_IMAGE_CALLBACK_GAS
-        ){value: CREATE_IMAGE_CALLBACK_GAS};
+            CREATE_IMAGE_CALLBACK_GAS);
         
         emit RequestSent(requestId);
         requestIdToNftOwner[requestId] = msg.sender;
     }
 
     function createNftMetadataFromImage(bytes32 requestId) external onlyDtn {
-        (,,string memory ipfsCid) = ai.fetch_response();
+        (,,string memory ipfsCid) = ai().fetchResponse(requestId);
         
         // Get model ID from model manager
         bytes32 metadataModelId = modelManager.modelId("system.models.openai.gpt-4");
@@ -171,22 +166,21 @@ contract NftAi is
             abi.encode(ipfsCid)
         );
 
-        CallBack memory callback = CallBack(
+        IDtnAi.CallBack memory callback = IDtnAi.CallBack(
             address(this),
             this.mintNft.selector,
             this.aiError.selector
         );
 
-        bytes32 nextRequestId = ai.request(
+        bytes32 nextRequestId = ai().request{value: CREATE_METADATA_CALLBACK_GAS}(
             sessionId,
-            [],
             metadataModelId,
             DtnDefaults.defaultRoutingSystemValidatedAny(),
-            DtnAi.DtnRequest({ call: aiCall, calltype: DtnAi.CallType.IPFS }),
+            IDtnAi.DtnRequest({ call: aiCall, calltype: IDtnAi.CallType.IPFS }),
             callback,
             msg.sender,
             CREATE_METADATA_CALLBACK_GAS
-        ){value: CREATE_METADATA_CALLBACK_GAS};
+        );
 
         emit RequestSent(nextRequestId);
         requestIdToNftOwner[nextRequestId] = requestIdToNftOwner[requestId];
@@ -194,7 +188,7 @@ contract NftAi is
 
     function mintNft(bytes32 requestId) external onlyDtn {
         // Given the nft metadata, mint an nft
-        (,,string memory ipfsCid) = ai.fetch_response();
+        (,,string memory ipfsCid) = ai().fetchResponse(requestId);
         mintTokenFromJson(requestIdToNftOwner[requestId], ipfsCid);
     }
 
@@ -277,7 +271,17 @@ contract NftAi is
         return super.tokenURI(tokenId);
     }
 
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) 
+        public 
+        view 
+        virtual 
+        override(
+            ERC721Upgradeable, 
+            ERC721EnumerableUpgradeable,
+            ERC721URIStorageUpgradeable
+        ) 
+        returns (bool) 
+    {
         return super.supportsInterface(interfaceId);
     }
 }

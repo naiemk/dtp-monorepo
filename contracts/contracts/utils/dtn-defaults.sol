@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-library DtnDefaults {
-    struct DtnRouting {
-        string trustNamespaceId;
-    }
+import "./idtn-ai.sol";
 
-    function defaultRoutingSystemValidatedAny() internal pure returns (DtnRouting memory) {
-        return DtnRouting({
-            trustNamespaceId: "system.routing.validated.any"
+library DtnDefaults {
+    function defaultRoutingSystemValidatedAny() internal pure returns (IDtnAi.DtnRouting memory) {
+        bytes32[] memory namespaces = new bytes32[](1);
+        namespaces[0] = keccak256(abi.encode("system.routing.validated.any"));
+        
+        return IDtnAi.DtnRouting({
+            trustNamespaceIds: namespaces,
+            redundancy: 1,
+            confidenceLevel: 8,
+            aggregationType: IDtnAi.AggregationType.ANY
         });
     }
 

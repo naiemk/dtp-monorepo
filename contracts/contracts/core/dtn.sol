@@ -14,15 +14,16 @@ library Dtn {
     bytes32 public constant GENERAL_ADMIN_ROLE = keccak256("GENERAL_ADMIN_ROLE");
 
     // Trust namespace prefixes
-    string constant TRUST_AUTHORED_PREFIX = "trust.authored.";
-    string constant TRUST_VERIFIED_PREFIX = "trust.verified.";
-    string constant TRUST_DTP_PREFIX = "trust.dtp.";
+    string internal constant TRUST_AUTHORED_PREFIX = "trust.authored.";
+    string internal constant TRUST_VERIFIED_PREFIX = "trust.verified.";
+    string internal constant TRUST_DTP_PREFIX = "trust.dtp.";
 
     struct TrustNamespace {
         address owner;
         uint256 stake;
         bool isActive;
-        string namespaceType; // "authored", "verified", or "dtp"
+        string namespacePrefix; // "authored", "verified", or "dtp"
+        address nodeSelector; // The node selector contract (implements INodeSelector)
     }
 
     // Helper functions for namespace validation
@@ -34,7 +35,7 @@ library Dtn {
         return startsWith(namespace, TRUST_VERIFIED_PREFIX);
     }
 
-    function isDtpNamespace(string memory namespace) internal pure returns (bool) {
+    function isDtnNamespace(string memory namespace) internal pure returns (bool) {
         return startsWith(namespace, TRUST_DTP_PREFIX);
     }
 
@@ -45,57 +46,65 @@ library Dtn {
      * @return bool True if str starts with prefix
      */
     function startsWith(string memory str, string memory prefix) internal pure returns (bool) {
+        bool result;
         assembly {
             // Load lengths
             let strLen := mload(str)
             let prefixLen := mload(prefix)
             
-            // If prefix is longer than string, return false
+            // If prefix is longer than string, result is false
             if gt(prefixLen, strLen) {
-                return(0, 0)
+                result := 0
             }
-            
-            // Compare the first word (32 bytes)
-            let strPtr := add(str, 32)
-            let prefixPtr := add(prefix, 32)
-            
-            // If prefix length is 32 or less, we only need one word comparison
-            if lte(prefixLen, 32) {
-                // Create masks for the relevant bytes
-                let mask := not(sub(exp(256, sub(32, prefixLen)), 1))
+            // Otherwise proceed with comparison
+            if iszero(gt(prefixLen, strLen)) {
+                let strPtr := add(str, 32)
+                let prefixPtr := add(prefix, 32)
                 
-                // Compare the masked values
-                let strWord := and(mload(strPtr), mask)
-                let prefixWord := and(mload(prefixPtr), mask)
-                
-                return(eq(strWord, prefixWord), 32)
-            }
-            
-            // For longer prefixes, compare full words first
-            let words := div(prefixLen, 32)
-            for { let i := 0 } lt(i, words) { i := add(i, 1) } {
-                let strWord := mload(add(strPtr, mul(i, 32)))
-                let prefixWord := mload(add(prefixPtr, mul(i, 32)))
-                
-                if iszero(eq(strWord, prefixWord)) {
-                    return(0, 0)
+                // If prefix length is 32 or less, we only need one word comparison
+                if lt(prefixLen, 33) {
+                    // Create masks for the relevant bytes
+                    let mask := not(sub(exp(256, sub(32, prefixLen)), 1))
+                    
+                    // Compare the masked values
+                    let strWord := and(mload(strPtr), mask)
+                    let prefixWord := and(mload(prefixPtr), mask)
+                    
+                    result := eq(strWord, prefixWord)
+                }
+                // For longer prefixes
+                if iszero(lt(prefixLen, 33)) {
+                    // Start with result as true
+                    result := 1
+                    
+                    // Compare full words first
+                    let words := div(prefixLen, 32)
+                    for { let i := 0 } lt(i, words) { i := add(i, 1) } {
+                        let strWord := mload(add(strPtr, mul(i, 32)))
+                        let prefixWord := mload(add(prefixPtr, mul(i, 32)))
+                        
+                        if iszero(eq(strWord, prefixWord)) {
+                            result := 0
+                            // Break the loop
+                            i := words
+                        }
+                    }
+                    
+                    // If still true, compare remaining bytes if any
+                    if and(result, gt(mod(prefixLen, 32), 0)) {
+                        let remainder := mod(prefixLen, 32)
+                        let offset := mul(words, 32)
+                        let mask := not(sub(exp(256, sub(32, remainder)), 1))
+                        
+                        let strWord := and(mload(add(strPtr, offset)), mask)
+                        let prefixWord := and(mload(add(prefixPtr, offset)), mask)
+                        
+                        result := eq(strWord, prefixWord)
+                    }
                 }
             }
-            
-            // Compare remaining bytes if any
-            let remainder := mod(prefixLen, 32)
-            if gt(remainder, 0) {
-                let offset := mul(words, 32)
-                let mask := not(sub(exp(256, sub(32, remainder)), 1))
-                
-                let strWord := and(mload(add(strPtr, offset)), mask)
-                let prefixWord := and(mload(add(prefixPtr, offset)), mask)
-                
-                return(eq(strWord, prefixWord), 32)
-            }
-            
-            return(1, 32)
         }
+        return result;
     }
 
     // Functionalities for 'request_ai', fetch_response, and fetch_error
