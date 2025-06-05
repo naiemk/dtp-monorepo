@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+interface IDtnAiModels {
+    function modelId(string memory modelName) external view returns (bytes32);
+}
+
 /**
  * @title IDtnAi
  * @notice Interface for DtnAI, defining the core AI interaction methods
  */
-interface IDtnAi {
+interface IDtnAi is IDtnAiModels {
     /**
      * @notice Represents different types of AI call responses
      */

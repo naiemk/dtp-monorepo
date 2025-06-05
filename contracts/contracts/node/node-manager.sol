@@ -24,7 +24,6 @@ abstract contract NodeManagerUpgradeable is
     struct NodeStorageV001 {
         mapping(bytes32 => Node) nodes;
         mapping(bytes32 => bytes32[]) nodeModels;
-        mapping(bytes32 => ModelConfig) modelConfigs;
         uint256 minStakeAmount;
     }
 
@@ -111,7 +110,7 @@ abstract contract NodeManagerUpgradeable is
         emit NodeStatusUpdated(nodeId, isActive);
     }
 
-    function setNodeModels(bytes32 nodeId, ModelConfig[] memory models) external whenNotPaused {
+    function setNodeModels(bytes32 nodeId, IModelManager.ModelConfig[] memory models) external whenNotPaused {
         NodeStorageV001 storage $ = getNodeStorageV001();
         require($.nodes[nodeId].staker == msg.sender, "Not node staker");
         
@@ -155,10 +154,10 @@ abstract contract NodeManagerUpgradeable is
         return getNodeStorageV001().nodes[nodeId];
     }
 
-    function getNodeModels(bytes32 nodeId) external view returns (ModelConfig[] memory) {
+    function getNodeModels(bytes32 nodeId) external view returns (IModelManager.ModelConfig[] memory) {
         NodeStorageV001 storage $ = getNodeStorageV001();
         bytes32[] memory modelIds = $.nodeModels[nodeId];
-        ModelConfig[] memory configs = new ModelConfig[](modelIds.length);
+        IModelManager.ModelConfig[] memory configs = new IModelManager.ModelConfig[](modelIds.length);
         
         for (uint256 i = 0; i < modelIds.length; i++) {
             configs[i] = $.modelConfigs[modelIds[i]];

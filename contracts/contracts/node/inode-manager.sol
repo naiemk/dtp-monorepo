@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "../core/dtn.sol";
+import "../model/imodel-manager.sol";
 
 /**
  * @title INodeManager
@@ -14,21 +15,18 @@ interface INodeManager {
     struct Node {
         address staker;          // Address of the node staker
         address worker;          // Address of the node worker
-        string[] namespaces;     // List of namespaces supported by the node
+        bytes32[] trustNamespaces; // List of namespaces supported by the node
+        bytes32 nodeNamespaceId; // Node namespace ID
         bool isActive;           // Node activation status
         uint256 stakedAmount;    // Amount staked by the node
-        uint256 responseRate;    // Node response rate score (0-10000)
-        uint256 validAnswerRate; // Valid answer rate score (0-10000)
-        uint256 complainRate;    // Complain rate score (0-10000)
+        bytes32 id;              // Node ID
     }
 
-    /// @notice Struct to store model serving configuration
-    struct ModelConfig {
-        bytes32 modelNamespaceId; // The namespace id of the model group
-        bytes32 modelId;
-        string modelName;
-        uint256 requestPricePerByte;
-        uint256 responsePricePerByte;
+    struct User {
+        string namesapce;
+        bytes32 namespaceId;
+        address owner;
+        address staker;
     }
 
     /// @notice Emitted when a new node is registered
@@ -41,7 +39,7 @@ interface INodeManager {
     event NodeNamespacesUpdated(bytes32 indexed nodeId, string[] namespaces);
     
     /// @notice Emitted when node models are updated
-    event NodeModelsUpdated(bytes32 indexed nodeId, ModelConfig[] models);
+    event NodeModelsUpdated(bytes32 indexed nodeId, IModelManager.ModelConfig[] models);
     
     /// @notice Emitted when node scores are updated
     event NodeScoresUpdated(
@@ -51,15 +49,26 @@ interface INodeManager {
         uint256 complainRate
     );
 
+    /// @notice Register a new user
+    function registerUser(
+        string memory namespace,
+        address staker
+    ) external;
+
     /// @notice Register a new node
     function registerNode(
         bytes32 nodeId,
-        address worker,
-        string[] calldata namespaces,
-        bytes[] calldata namespaceSignatures
+        address worker
     ) external payable;
 
-    /// @notice Update node namespaces
+    /**
+     * @notice Update node namespaces. Namespace owners must sign the namespaces.
+     * For example, if a node is part of a proprietory trusted group, the group
+     * owner will sign the namespaces.
+     * @param nodeId The node id
+     * @param namespaces The namespaces to update
+     * @param namespaceSignatures The signatures of the namespaces
+     */
     function updateNodeNamespaces(
         bytes32 nodeId,
         string[] calldata namespaces,
@@ -70,26 +79,11 @@ interface INodeManager {
     function setNodeStatus(bytes32 nodeId, bool isActive) external;
 
     /// @notice Set models served by the node
-    function setNodeModels(bytes32 nodeId, ModelConfig[] calldata models) external;
-
-    /// @notice Update node scores
-    function updateNodeScores(
-        bytes32 nodeId,
-        uint256 responseRate,
-        uint256 validAnswerRate,
-        uint256 complainRate
-    ) external;
+    function setNodeModels(bytes32 nodeId, bytes32[] calldata modelIds) external;
 
     /// @notice Get node details
     function getNode(bytes32 nodeId) external view returns (Node memory);
 
     /// @notice Get node models configuration
-    function getNodeModels(bytes32 nodeId) external view returns (ModelConfig[] memory);
-
-    /// @notice Select nodes for a given model namespace
-    function selectNodes(
-        bytes32 modelNamespace,
-        uint256 quality,
-        uint256 maxPrice
-    ) external view returns (bytes32[] memory);
+    function getNodeModels(bytes32 nodeId) external view returns (bytes32[] memory);
 }

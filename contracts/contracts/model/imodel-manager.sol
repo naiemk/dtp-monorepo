@@ -17,15 +17,28 @@ interface IModelManager {
     error UnauthorizedNamespaceAccess(string namespace);
     error InvalidModelName(string modelName);
 
-    /// @notice Register a new model namespace
-    /// @param namespace The namespace to register
-    function registerModelNamespace(string memory namespace) external;
+    /// @notice Struct to store model API configuration
+    struct ModelApi {
+        bytes32 apiNamespaceId;
+        string apiName;
+        bytes32 apiId;
+        string specs;
+        string docs;
+    }
+
+    /// @notice Struct to store model serving configuration
+    struct ModelConfig {
+        bytes32 modelNamespaceId; // The namespace id of the model group
+        bytes32 modelId;
+        string modelName;
+    }
 
     /// @notice Register a model API for a namespace
     /// @param namespace The namespace the API belongs to
-    /// @param api The API specification
+    /// @param apiName The API name
+    /// @param specs The API specification
     /// @param docs Documentation for the API
-    function registerModelAPI(string memory namespace, string memory api, string memory docs) external;
+    function registerModelAPI(string memory namespace, string memory apiName, string memory specs, string memory docs) external;
 
     /// @notice Register a new model in a namespace
     /// @param namespace The namespace to register the model in
@@ -33,8 +46,13 @@ interface IModelManager {
     /// @return modelId The unique identifier for the model
     function registerModel(string memory namespace, string memory modelName) external returns (bytes32);
 
-    /// @notice Get a model's ID by its full name (namespace.modelName)
-    /// @param modelName The full model name (e.g., "system.models.openai.gpt-4")
-    /// @return The model ID
-    function modelId(string memory modelName) external view returns (bytes32);
+    /// @notice Get the model API configuration
+    /// @param apiId The unique identifier for the model API
+    /// @return modelApi The model API configuration
+    function getModelAPI(bytes32 apiId) external view returns (ModelApi memory);
+
+    /// @notice Get the model configuration
+    /// @param modelId The unique identifier for the model
+    /// @return modelConfig The model configuration
+    function getModelConfig(bytes32 modelId) external view returns (ModelConfig memory);
 }

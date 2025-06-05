@@ -98,12 +98,10 @@ contract RouterUpgradeable is
         return SessionManagerUpgradeable._closeUserSession(sessionId);
     }
 
-
-
     // IDtnAi Implementation
     function request(
         uint256 sessionId,
-        bytes32 modelId,
+        bytes32 _modelId,
         IDtnAi.DtnRouting memory routingSystem,
         IDtnAi.DtnRequest memory dtnRequest,
         IDtnAi.CallBack memory callback,
@@ -148,6 +146,10 @@ contract RouterUpgradeable is
         // We use the first trust namespace in the routing that implements
         // an algorithm to select the nodes
         // turstNamespace.nodeSelector.selectNodes(requestId);
+
+        // Get the node selector
+        //address nodeSelector = mo
+
         return requestId;
     }
 

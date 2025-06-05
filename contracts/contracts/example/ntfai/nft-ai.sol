@@ -9,7 +9,6 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721Burnab
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "../../model/imodel-manager.sol";
 import "../../utils/dtn-defaults.sol";
 
 /**
@@ -54,8 +53,6 @@ contract NftAi is
     event MinPriceUpdated(uint256 newPrice);
     event PurchaseAttempted(address indexed buyer, string prompt, uint256 value);
 
-    IModelManager public modelManager;
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -63,7 +60,6 @@ contract NftAi is
 
     function initialize(
         address router, 
-        address _modelManager,
         uint256 _minPrice
     ) public initializer {
         __ERC721_init("AI Generated NFT", "AINFT");
@@ -74,7 +70,6 @@ contract NftAi is
         __ReentrancyGuard_init();
         __Pausable_init();
         __WithDtnAi_init(router);
-        modelManager = IModelManager(_modelManager);
         minPrice = _minPrice;
     }
 
@@ -120,7 +115,7 @@ contract NftAi is
         emit PurchaseAttempted(msg.sender, userSubPrompt, msg.value);
 
         // Get model ID from model manager
-        bytes32 imageModelId = modelManager.modelId("system.models.openai.dall-e-3");
+        bytes32 imageModelId = ai().modelId("system.models.openai.dall-e-3");
         
         bytes memory aiCall = abi.encode(
             "createImage",
@@ -157,7 +152,7 @@ contract NftAi is
         (,,string memory ipfsCid) = ai().fetchResponse(requestId);
         
         // Get model ID from model manager
-        bytes32 metadataModelId = modelManager.modelId("system.models.openai.gpt-4");
+        bytes32 metadataModelId = ai().modelId("system.models.openai.gpt-4");
         
         bytes memory aiCall = abi.encode(
             "text",
