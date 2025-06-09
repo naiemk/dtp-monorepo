@@ -13,21 +13,19 @@ import "../model/imodel-manager.sol";
 interface INodeManager {
     /// @notice Struct to store node details
     struct Node {
+        address owner;           // Address of the node owner
         address staker;          // Address of the node staker
         address worker;          // Address of the node worker
         bytes32[] trustNamespaces; // List of namespaces supported by the node
+        uint256[] trustNamespaceExpirations; // List of namespace expiration times
         bytes32 nodeNamespaceId; // Node namespace ID
         bool isActive;           // Node activation status
         uint256 stakedAmount;    // Amount staked by the node
         bytes32 id;              // Node ID
     }
 
-    struct User {
-        string namesapce;
-        bytes32 namespaceId;
-        address owner;
-        address staker;
-    }
+    /// @notice Emitted when a new user is registered
+    event UserRegistered(bytes32 indexed userId, address indexed owner, address staker);
 
     /// @notice Emitted when a new node is registered
     event NodeRegistered(bytes32 indexed nodeId, address indexed staker, address worker);
@@ -49,7 +47,12 @@ interface INodeManager {
         uint256 complainRate
     );
 
-    /// @notice Register a new user
+    /**
+     * @notice Register a new user. It will also register three namespaces:
+     * "node.userid", "model.node.userid", "api.node.userid"
+     * @param namespace The namespace of the user
+     * @param staker The address of the staker
+     */
     function registerUser(
         string memory namespace,
         address staker
@@ -57,7 +60,8 @@ interface INodeManager {
 
     /// @notice Register a new node
     function registerNode(
-        bytes32 nodeId,
+        string memory username,
+        string memory nodeName,
         address worker
     ) external payable;
 
@@ -72,6 +76,7 @@ interface INodeManager {
     function updateNodeNamespaces(
         bytes32 nodeId,
         string[] calldata namespaces,
+        uint256[] calldata namespaceExpirations,
         bytes[] calldata namespaceSignatures
     ) external;
 

@@ -13,7 +13,7 @@ library NamespaceUtils {
                 bytes memory namespaceBytes = bytes(namespace);
         uint256 length = namespaceBytes.length;
         uint256 lastDotPos;
-        require(length != 0, "no namespace")
+        require(length != 0, "no namespace");
 
         // Use assembly to efficiently find the last dot position
         assembly {
@@ -29,9 +29,7 @@ library NamespaceUtils {
                 ptr := sub(ptr, 1)
             }
         }
-        console.log("AST", lastDotPos);
-
-        require(lastDotPos != 0, "bad namespace")
+        require(lastDotPos != 0, "bad namespace");
 
         // Create the namespace and resource parts using efficient memory copies
         bytes memory namespacePart = new bytes(lastDotPos - 1);

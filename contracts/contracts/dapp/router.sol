@@ -7,6 +7,7 @@ import "../core/trust.sol";
 import "../node/node-manager.sol";
 import "../utils/idtn-ai.sol";
 import "../session/session-manager.sol";
+import "../core/multiowner-base.sol";
 
 /**
  * @title Router
@@ -14,6 +15,7 @@ import "../session/session-manager.sol";
  */
 contract RouterUpgradeable is 
     Initializable, 
+    MultiOwnerBase,
     ModelManagerUpgradeable, 
     TrustManagerUpgradeable,
     NodeManagerUpgradeable,
