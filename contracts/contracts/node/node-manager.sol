@@ -29,8 +29,14 @@ abstract contract NodeManagerUpgradeable is
         address namespaceManager;
         mapping(bytes32 => string) users;
         mapping(bytes32 => Node) nodes;
-        mapping(bytes32 => bytes32[]) assignedNamespaces;
-        mapping(bytes32 => mapping(bytes32 => uint256)) assignedNamespaceExpiration;
+        mapping(bytes32 => bytes32[]) nodeModels;
+        mapping(bytes32 => mapping(bytes32 => bool)) modelToNode;
+        mapping(bytes32 => bytes32[]) modelToNodeList;
+        // New mappings for efficient lookups
+        mapping(bytes32 => mapping(bytes32 => bool)) nodeHasTrustNamespace; // nodeId => namespaceId => hasNamespace
+        mapping(bytes32 => mapping(bytes32 => uint256)) nodeTrustNamespaceExpiration; // nodeId => namespaceId => expiration
+        mapping(bytes32 => mapping(bytes32 => bool)) nodeServesModel; // nodeId => modelId => servesModel
+
         uint256 minStakeAmount;
     }
 
@@ -122,6 +128,64 @@ abstract contract NodeManagerUpgradeable is
         emit NodeRegistered(nodeNamespaceId, msg.sender, worker);
     }
 
+    function _clearNodeNamespaces(bytes32 nodeId) internal {
+        NodeStorageV001 storage $ = getNodeStorageV001();
+        bytes32[] storage existingNamespaces = $.nodes[nodeId].trustNamespaces;
+        for (uint256 i = 0; i < existingNamespaces.length; i++) {
+            bytes32 namespaceId = existingNamespaces[i];
+            $.nodeHasTrustNamespace[nodeId][namespaceId] = false;
+            $.nodeTrustNamespaceExpiration[nodeId][namespaceId] = 0;
+        }
+        delete $.nodes[nodeId].trustNamespaces;
+        delete $.nodes[nodeId].trustNamespaceExpirations;
+    }
+
+    function _verifyNamespaceSignature(
+        bytes32 nodeId,
+        string memory namespace,
+        bytes memory signature
+    ) internal view returns (bytes32) {
+        bytes32 namespaceId = keccak256(abi.encodePacked(namespace));
+        address namespaceOwner = INamespaceManager(getNodeStorageV001().namespaceManager).getNamespaceOwner(namespaceId);
+        require(namespaceOwner != address(0), "Namespace does not exist");
+
+        // Verify EIP712 signature
+        bytes32 structHash = keccak256(abi.encode(
+            NAMESPACE_ASSIGNMENT_TYPEHASH,
+            nodeId,
+            keccak256(bytes(namespace)),
+            block.timestamp + 365 days // Default expiration 1 year
+        ));
+
+        bytes32 hash = keccak256(abi.encodePacked(
+            "\x19\x01",
+            keccak256(abi.encode(
+                DOMAIN_SEPARATOR_TYPEHASH,
+                keccak256("DeepTrust Network"),
+                keccak256("1"),
+                block.chainid,
+                address(this)
+            )),
+            structHash
+        ));
+
+        address signer = hash.recover(signature);
+        require(signer == namespaceOwner, "Invalid signature");
+        return namespaceId;
+    }
+
+    function _addNamespaceToNode(
+        bytes32 nodeId,
+        bytes32 namespaceId,
+        uint256 expiration
+    ) internal {
+        NodeStorageV001 storage $ = getNodeStorageV001();
+        $.nodes[nodeId].trustNamespaces.push(namespaceId);
+        $.nodes[nodeId].trustNamespaceExpirations.push(expiration);
+        $.nodeHasTrustNamespace[nodeId][namespaceId] = true;
+        $.nodeTrustNamespaceExpiration[nodeId][namespaceId] = expiration;
+    }
+
     function updateNodeNamespaces(
         bytes32 nodeId,
         string[] calldata namespaces,
@@ -132,38 +196,13 @@ abstract contract NodeManagerUpgradeable is
         require($.nodes[nodeId].staker == msg.sender, "Not node staker");
         require(namespaces.length == namespaceSignatures.length, "Invalid signatures length");
 
-        // Verify namespace signatures
+        // Clear existing namespaces
+        _clearNodeNamespaces(nodeId);
+
+        // Add new namespaces
         for (uint256 i = 0; i < namespaces.length; i++) {
-            bytes32 namespaceId = keccak256(abi.encodePacked(namespaces[i]));
-            address namespaceOwner = INamespaceManager($.namespaceManager).getNamespaceOwner(namespaceId);
-            require(namespaceOwner != address(0), "Namespace does not exist");
-
-            // Verify EIP712 signature
-            bytes32 structHash = keccak256(abi.encode(
-                NAMESPACE_ASSIGNMENT_TYPEHASH,
-                nodeId,
-                keccak256(bytes(namespaces[i])),
-                block.timestamp + 365 days // Default expiration 1 year
-            ));
-
-            bytes32 hash = keccak256(abi.encodePacked(
-                "\x19\x01",
-                keccak256(abi.encode(
-                    DOMAIN_SEPARATOR_TYPEHASH,
-                    keccak256("DeepTrust Network"),
-                    keccak256("1"),
-                    block.chainid,
-                    address(this)
-                )),
-                structHash
-            ));
-
-            address signer = hash.recover(namespaceSignatures[i]);
-            require(signer == namespaceOwner, "Invalid signature");
-
-            // Add namespace to node's trust namespaces
-            $.nodes[nodeId].trustNamespaces.push(namespaceId);
-            $.nodes[nodeId].trustNamespaceExpirations.push(namespaceExpirations[i]);
+            bytes32 namespaceId = _verifyNamespaceSignature(nodeId, namespaces[i], namespaceSignatures[i]);
+            _addNamespaceToNode(nodeId, namespaceId, namespaceExpirations[i]);
         }
 
         emit NodeNamespacesUpdated(nodeId, namespaces);
@@ -177,11 +216,117 @@ abstract contract NodeManagerUpgradeable is
         emit NodeStatusUpdated(nodeId, isActive);
     }
 
-    function getNode(bytes32 nodeId) external view override returns (Node memory) {
-        return getNodeStorageV001().nodes[nodeId];
+    function getNode(bytes32 nodeId) external view override returns (NodeData memory) {
+        Node storage node = getNodeStorageV001().nodes[nodeId];
+        return NodeData({
+            owner: node.owner,
+            staker: node.staker,
+            worker: node.worker,
+            trustNamespaces: node.trustNamespaces,
+            trustNamespaceExpirations: node.trustNamespaceExpirations,
+            nodeNamespaceId: node.nodeNamespaceId,
+            isActive: node.isActive,
+            stakedAmount: node.stakedAmount,
+            id: node.id
+        });
     }
 
-    function _authorizeUpgrade(address /*newImplementation*/) internal override view {
+    function setNodeModels(bytes32 nodeId, bytes32[] calldata modelIds) external override {
+        NodeStorageV001 storage $ = getNodeStorageV001();
+        require($.nodes[nodeId].owner == msg.sender, "Not node owner");
+        require($.nodes[nodeId].isActive, "Node is not active");
+
+        // Clear existing models
+        bytes32[] storage existingModels = $.nodeModels[nodeId];
+        for (uint256 i = 0; i < existingModels.length; i++) {
+            bytes32 modelId = existingModels[i];
+            delete $.nodeServesModel[nodeId][modelId];
+            delete $.modelToNode[modelId][nodeId];
+            
+            // Remove node from model's node list
+            bytes32[] storage nodeList = $.modelToNodeList[modelId];
+            for (uint256 j = 0; j < nodeList.length; j++) {
+                if (nodeList[j] == nodeId) {
+                    // Replace with last element and pop
+                    nodeList[j] = nodeList[nodeList.length - 1];
+                    nodeList.pop();
+                    break;
+                }
+            }
+        }
+        delete $.nodeModels[nodeId];
+
+        // Add new models
+        for (uint256 i = 0; i < modelIds.length; i++) {
+            bytes32 modelId = modelIds[i];
+            $.nodeModels[nodeId].push(modelId);
+            $.nodeServesModel[nodeId][modelId] = true;
+            $.modelToNode[modelId][nodeId] = true;
+            $.modelToNodeList[modelId].push(nodeId);
+        }
+
+        emit NodeModelsUpdated(nodeId, modelIds);
+    }
+
+    function getNodesServingModel(bytes32 modelId) external view override returns (bytes32[] memory) {
+        return getNodeStorageV001().modelToNodeList[modelId];
+    }
+
+    function removeModelsFromNode(bytes32 nodeId, bytes32[] calldata modelIds) external override {
+        NodeStorageV001 storage $ = getNodeStorageV001();
+        require($.nodes[nodeId].owner == msg.sender, "Not node owner");
+
+        bytes32[] storage nodeModels = $.nodeModels[nodeId];
+        
+        // Remove each model from the node's model list and the modelToNode mapping
+        for (uint256 i = 0; i < modelIds.length; i++) {
+            bytes32 modelId = modelIds[i];
+            require($.nodeServesModel[nodeId][modelId], "Model not assigned to node");
+            
+            // Remove from nodeServesModel mapping
+            $.nodeServesModel[nodeId][modelId] = false;
+            
+            // Remove from modelToNode mapping
+            delete $.modelToNode[modelId][nodeId];
+            
+            // Remove from modelToNodeList
+            bytes32[] storage nodeList = $.modelToNodeList[modelId];
+            for (uint256 j = 0; j < nodeList.length; j++) {
+                if (nodeList[j] == nodeId) {
+                    // Replace with last element and pop
+                    nodeList[j] = nodeList[nodeList.length - 1];
+                    nodeList.pop();
+                    break;
+                }
+            }
+            
+            // Remove from nodeModels array
+            for (uint256 j = 0; j < nodeModels.length; j++) {
+                if (nodeModels[j] == modelId) {
+                    // Replace with last element and pop
+                    nodeModels[j] = nodeModels[nodeModels.length - 1];
+                    nodeModels.pop();
+                    break;
+                }
+            }
+        }
+
+        emit NodeModelsUpdated(nodeId, nodeModels);
+    }
+
+    function nodeHasTrustNamespace(bytes32 nodeId, bytes32 namespaceId) external view override returns (bool) {
+        return getNodeStorageV001().nodeHasTrustNamespace[nodeId][namespaceId];
+    }
+
+    function nodeTrustNamespaceExpiration(bytes32 nodeId, bytes32 namespaceId) external view override returns (uint256) {
+        return getNodeStorageV001().nodeTrustNamespaceExpiration[nodeId][namespaceId];
+    }
+
+    function nodeServesModel(bytes32 nodeId, bytes32 modelId) external view override returns (bool) {
+        return getNodeStorageV001().nodeServesModel[nodeId][modelId];
+    }
+
+    function _authorizeUpgrade(address /*newImplementation*/) internal virtual override view {
         require(hasRole(Dtn.OWNER_ROLE, msg.sender), "Not authorized");
     }
 }

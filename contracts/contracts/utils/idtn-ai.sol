@@ -42,6 +42,17 @@ interface IDtnAi is IDtnAiModels {
     }
 
     /**
+     * @notice Structure for AI response
+     */
+    struct Response {
+        uint256 status;      // Response status code
+        string message;      // Additional message or error details
+        string response;     // The actual response data
+        bytes32 nodeId;      // ID of the node that provided the response
+        uint256 timestamp;   // When the response was provided
+    }
+
+    /**
      * @notice Callback structure for handling AI responses
      */
     struct CallBack {

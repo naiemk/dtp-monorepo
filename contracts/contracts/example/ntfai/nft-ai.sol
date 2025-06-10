@@ -8,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721Burnab
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "../../core/multiowner-base.sol";
 import "../../utils/dtn-defaults.sol";
 
@@ -21,6 +22,7 @@ import "../../utils/dtn-defaults.sol";
 
 contract NftAi is
     WithDtnAiUpgradeable,
+    OwnableUpgradeable,
     ERC721URIStorageUpgradeable,
     ERC721BurnableUpgradeable,
     ERC721EnumerableUpgradeable,

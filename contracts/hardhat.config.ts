@@ -3,7 +3,15 @@ import "@nomicfoundation/hardhat-toolbox";
 import "@typechain/hardhat";
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.28",
+  solidity: {
+    version: "0.8.28",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+    },
+  },
   typechain: {
     outDir: "typechain-types",
     target: "ethers-v6",

@@ -24,6 +24,19 @@ interface INodeManager {
         bytes32 id;              // Node ID
     }
 
+    /// @notice Flattened node data for external returns
+    struct NodeData {
+        address owner;
+        address staker;
+        address worker;
+        bytes32[] trustNamespaces;
+        uint256[] trustNamespaceExpirations;
+        bytes32 nodeNamespaceId;
+        bool isActive;
+        uint256 stakedAmount;
+        bytes32 id;
+    }
+
     /// @notice Emitted when a new user is registered
     event UserRegistered(bytes32 indexed userId, address indexed owner, address staker);
 
@@ -37,7 +50,7 @@ interface INodeManager {
     event NodeNamespacesUpdated(bytes32 indexed nodeId, string[] namespaces);
     
     /// @notice Emitted when node models are updated
-    event NodeModelsUpdated(bytes32 indexed nodeId, IModelManager.ModelConfig[] models);
+    event NodeModelsUpdated(bytes32 indexed nodeId, bytes32[] modelIds);
     
     /// @notice Emitted when node scores are updated
     event NodeScoresUpdated(
@@ -80,15 +93,30 @@ interface INodeManager {
         bytes[] calldata namespaceSignatures
     ) external;
 
-    /// @notice Set node activation status
-    function setNodeStatus(bytes32 nodeId, bool isActive) external;
-
     /// @notice Set models served by the node
     function setNodeModels(bytes32 nodeId, bytes32[] calldata modelIds) external;
 
     /// @notice Get node details
-    function getNode(bytes32 nodeId) external view returns (Node memory);
+    function getNode(bytes32 nodeId) external view returns (NodeData memory);
 
     /// @notice Get node models configuration
     function getNodeModels(bytes32 nodeId) external view returns (bytes32[] memory);
+
+    /// @notice Get all nodes serving a specific model
+    function getNodesServingModel(bytes32 modelId) external view returns (bytes32[] memory);
+
+    /// @notice Remove models from a node
+    function removeModelsFromNode(bytes32 nodeId, bytes32[] calldata modelIds) external;
+
+    /// @notice Set node active status
+    function setNodeStatus(bytes32 nodeId, bool isActive) external;
+
+    /// @notice Check if a node has a specific trust namespace
+    function nodeHasTrustNamespace(bytes32 nodeId, bytes32 namespaceId) external view returns (bool);
+
+    /// @notice Get the expiration time for a node's trust namespace
+    function nodeTrustNamespaceExpiration(bytes32 nodeId, bytes32 namespaceId) external view returns (uint256);
+
+    /// @notice Check if a node serves a specific model
+    function nodeServesModel(bytes32 nodeId, bytes32 modelId) external view returns (bool);
 }
