@@ -3,12 +3,16 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../core/multiowner-base.sol";
 
 /**
  * @title SessionManager
  * @notice SessionManager is responsible for managing sessions
  */
-contract SessionManagerUpgradeable is Initializable {
+contract SessionManagerUpgradeable is Initializable, MultiOwnerBase {
+    using SafeERC20 for IERC20;
+
     struct Session {
         address owner;
         uint balance;
@@ -33,7 +37,7 @@ contract SessionManagerUpgradeable is Initializable {
     error TransferFailed();
 
     event SessionStarted(uint indexed sessionId, address indexed owner, uint balance);
-    event SessionCharged(uint indexed sessionId, uint amount);
+    event SessionCharged(uint indexed sessionId, uint amount, address indexed to);
     event SessionClosed(uint indexed sessionId, uint remainingBalance);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -79,10 +83,10 @@ contract SessionManagerUpgradeable is Initializable {
         }
     }
 
-    function chargeUserSession(uint sessionId, uint amount) public virtual {
+    function chargeUserSession(uint sessionId, uint amount, address to) public virtual onlyDtn {
         Session memory session = getSessionById(sessionId);
         if (session.owner != msg.sender) revert Unauthorized(msg.sender, session.owner);
-        _chargeSession(sessionId, amount);
+        _chargeSession(sessionId, amount, to);
     }
 
     function _startSession(address owner, uint balance) internal returns (uint) {
@@ -100,7 +104,7 @@ contract SessionManagerUpgradeable is Initializable {
         return sessionId;
     }
 
-    function _chargeSession(uint sessionId, uint amount) internal {
+    function _chargeSession(uint sessionId, uint amount, address to) internal {
         SessionManagerStorageV001 storage $ = _getStorage();
         Session storage session = $.sessions[sessionId];
         
@@ -110,7 +114,10 @@ contract SessionManagerUpgradeable is Initializable {
         }
         
         session.balance -= amount;
-        emit SessionCharged(sessionId, amount);
+        
+        IERC20($.feeToken).safeTransfer(to, amount);
+        
+        emit SessionCharged(sessionId, amount, to);
     }
 
     function _closeSession(uint sessionId) internal returns (uint) {

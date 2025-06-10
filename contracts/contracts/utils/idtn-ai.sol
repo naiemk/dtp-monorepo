@@ -32,10 +32,14 @@ interface IDtnAi is IDtnAiModels {
     struct DtnRequest {
         bytes call;     // Encoded call data
         CallType calltype;  // Type of response expected
+        uint256 feePerByteReq; // Fee per byte for request size
+        uint256 feePerByteRes; // Fee per byte for response size
+        uint256 totalFeePerRes; // Maximum total fee for response
     }
 
     struct DtnRouting {
         bytes32[] trustNamespaceIds;
+        bytes32[] trustedNodeIds; // Allows to specify a list of trusted nodes to answer the request
         uint32 redundancy; // How many nodes will answer the same request
         uint8 confidenceLevel; // 0 - 10
         AggregationType aggregationType;
@@ -106,4 +110,24 @@ interface IDtnAi is IDtnAiModels {
         string memory message,
         string memory response
     );
+
+    /**
+     * @notice Responds to an AI request
+     * @param requestId The ID of the request to respond to
+     * @param status The status of the response (0 for success)
+     * @param message Additional message or error details
+     * @param response The actual response data
+     * @param nodeId The ID of the responding node
+     * @param requestSize Size of request in bytes
+     * @param responseSize Size of response in bytes
+     */
+    function respondToRequest(
+        bytes32 requestId,
+        uint256 status,
+        string memory message,
+        string memory response,
+        bytes32 nodeId,
+        uint256 requestSize,
+        uint256 responseSize
+    ) external;
 }

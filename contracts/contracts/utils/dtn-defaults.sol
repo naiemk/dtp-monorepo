@@ -10,6 +10,7 @@ library DtnDefaults {
         
         return IDtnAi.DtnRouting({
             trustNamespaceIds: namespaces,
+            trustedNodeIds: new bytes32[](0),
             redundancy: 1,
             confidenceLevel: 8,
             aggregationType: IDtnAi.AggregationType.ANY

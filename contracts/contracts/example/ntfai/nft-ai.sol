@@ -134,7 +134,10 @@ contract NftAi is
 
         IDtnAi.DtnRequest memory dtnRequest = IDtnAi.DtnRequest({
             call: aiCall,
-            calltype: IDtnAi.CallType.IPFS
+            calltype: IDtnAi.CallType.IPFS,
+            feePerByteReq: 0,
+            feePerByteRes: 0,
+            totalFeePerRes: 0
         });
         bytes32 requestId = ai().request{value: CREATE_IMAGE_CALLBACK_GAS}(
             sessionId,
@@ -172,7 +175,7 @@ contract NftAi is
             sessionId,
             metadataModelId,
             DtnDefaults.defaultRoutingSystemValidatedAny(),
-            IDtnAi.DtnRequest({ call: aiCall, calltype: IDtnAi.CallType.IPFS }),
+            IDtnAi.DtnRequest({ call: aiCall, calltype: IDtnAi.CallType.IPFS, feePerByteReq: 0, feePerByteRes: 0, totalFeePerRes: 0 }),
             callback,
             msg.sender,
             CREATE_METADATA_CALLBACK_GAS

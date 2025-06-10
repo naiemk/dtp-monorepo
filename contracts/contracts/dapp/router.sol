@@ -161,8 +161,16 @@ contract RouterUpgradeable is
 
     function _verifyNodeTrustNamespace(
         bytes32 nodeId,
-        bytes32[] memory trustNamespaceIds
+        bytes32[] memory trustNamespaceIds,
+        bytes32[] memory trustedNodeIds
     ) internal view returns (bool) {
+        if (trustedNodeIds.length > 0) {
+            for (uint256 i = 0; i < trustedNodeIds.length; i++) {
+                if (trustedNodeIds[i] == nodeId) {
+                    return true;
+                }
+            }
+        }
         for (uint256 i = 0; i < trustNamespaceIds.length; i++) {
             bytes32 namespaceId = trustNamespaceIds[i];
             if (NodeManagerUpgradeable(address(this)).nodeHasTrustNamespace(nodeId, namespaceId)) {
@@ -230,21 +238,22 @@ contract RouterUpgradeable is
         uint256 status,
         string memory message,
         string memory response,
-        bytes32 nodeId
+        bytes32 nodeId,
+        uint256 requestSize,
+        uint256 responseSize
     ) external {
         RouterStorageV001 storage $ = getRouterStorageV001();
         Request storage requestData = $.requests[requestId];
+        {
         require(!requestData.completed, "Request already completed");
-
+        require(!$.nodeResponded[requestId][nodeId], "Node already responded");
         // Get node info
         NodeData memory node = this.getNode(nodeId);
         require(node.worker == msg.sender, "Not the node worker");
         require(node.isActive, "Node not active");
-        require(!$.nodeResponded[requestId][nodeId], "Node already responded");
-
         // Verify node has required trust namespace using efficient lookup
         require(
-            _verifyNodeTrustNamespace(nodeId, requestData.routing.trustNamespaceIds),
+            _verifyNodeTrustNamespace(nodeId, requestData.routing.trustNamespaceIds, requestData.routing.trustedNodeIds),
             "Node does not have required trust namespace"
         );
 
@@ -253,6 +262,22 @@ contract RouterUpgradeable is
             NodeManagerUpgradeable(address(this)).nodeServesModel(nodeId, requestData.modelId),
             "Node does not serve requested model"
         );
+
+        }
+
+
+        // Calculate request fee using request-specific rate
+        uint256 requestFee = requestSize * requestData.request.feePerByteReq;
+        
+        // Calculate response fee using response-specific rate
+        uint256 responseFee = responseSize * requestData.request.feePerByteRes;
+        
+        // Ensure response fee doesn't exceed maximum allowed
+        require(responseFee <= requestData.request.totalFeePerRes, "Response fee exceeds maximum");
+
+        // Charge the session for both request and response fees
+        uint256 totalFee = requestFee + responseFee;
+        SessionManagerUpgradeable.chargeUserSession(requestData.sessionId, totalFee, msg.sender);
 
         // Create and add response
         IDtnAi.Response memory newResponse = _createResponse(status, message, response, nodeId);
