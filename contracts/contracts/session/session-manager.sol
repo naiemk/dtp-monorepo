@@ -158,4 +158,12 @@ contract SessionManagerUpgradeable is Initializable, MultiOwnerBase {
         }
         return sessions;
     }
+
+    function getFeeToken() public view returns (address) {
+        return _getStorage().feeToken;
+    }
+
+    function getFeeTarget() public view returns (address) {
+        return _getStorage().feeTarget;
+    }
 }

@@ -95,6 +95,10 @@ contract RouterUpgradeable is
         }
     }
 
+    function feeToken() public override view returns (address) {
+        return SessionManagerUpgradeable.getFeeToken();
+    }
+
     /**
      * @notice Starts a new user session with specified token amount
      * @param amount Amount of tokens to allocate for the session

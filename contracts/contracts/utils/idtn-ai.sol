@@ -130,4 +130,6 @@ interface IDtnAi is IDtnAiModels {
         uint256 requestSize,
         uint256 responseSize
     ) external;
+
+    function feeToken() external view returns (address);
 }
