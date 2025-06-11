@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 import "./multiowner-base.sol";
 import "./inamespace-manager.sol";
 
-contract NamespaceManager is MultiOwnerBase, INamespaceManager {
+contract NamespaceManager is Initializable, MultiOwnerBase, INamespaceManager {
     /// @custom:storage-location erc7201:dtn.core.namespacemanager.001
     struct NamespaceManagerStorageV001 {
         mapping(bytes32 => NamespaceConfig) namespaces;
@@ -13,8 +13,17 @@ contract NamespaceManager is MultiOwnerBase, INamespaceManager {
     // keccak256(abi.encode(uint256(keccak256("dtn.core.namespacemanager.001")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant NamespaceManagerStorageV001Location = 0xa1a8a1e2cb6009f225580651017bd88c470975b96e9e7869a2efeb9cc01cfd00;
 
-    function __NamespaceManager_init() internal onlyInitializing {
-        __MultiOwnerBase_init();
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        // _disableInitializers();
+    }
+
+    function initialize(address _owner) public initializer {
+        __NamespaceManager_init(_owner);
+    }
+
+    function __NamespaceManager_init(address _owner) internal onlyInitializing {
+        __MultiOwnerBase_init(_owner);
     }
 
     function __NamespaceManager_init_unchained() internal onlyInitializing {

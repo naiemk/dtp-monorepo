@@ -2,13 +2,18 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../model/model-manager.sol";
 import "../core/trust.sol";
-import "../node/node-manager.sol";
 import "../utils/idtn-ai.sol";
-import "../session/session-manager.sol";
 import "../core/multiowner-base.sol";
 import "../core/iresponse-strategy.sol";
+import "../node/inode-manager.sol";
+import "../core/dtn.sol";
+import "../session/isession-manager.sol";
 
 /**
  * @title Router
@@ -16,16 +21,19 @@ import "../core/iresponse-strategy.sol";
  */
 contract RouterUpgradeable is
     Initializable,
+    UUPSUpgradeable,
+    AccessControlUpgradeable,
     MultiOwnerBase,
     ModelManagerUpgradeable,
     TrustManagerUpgradeable,
-    NodeManagerUpgradeable,
-    SessionManagerUpgradeable,
     IDtnAi
 {
+    using SafeERC20 for IERC20;
     /// @custom:storage-location erc7201:dtn.storage.router.001
     struct RouterStorageV001 {
         // Request management
+        address nodeManager;
+        address sessionManager;
         mapping(bytes32 => Request) requests;
         mapping(bytes32 => IDtnAi.Response[]) responses;
         mapping(bytes32 => mapping(bytes32 => bool)) nodeResponded; // requestId => nodeId => hasResponded
@@ -59,23 +67,23 @@ contract RouterUpgradeable is
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        _disableInitializers();
+        // _disableInitializers();
     }
 
     function initialize(
         uint256 minAuthoredStake,
         uint256 minNodeStake,
-        address feeToken,
-        address feeTarget
+        address owner
     ) public initializer {
+        __AccessControl_init();
+        __MultiOwnerBase_init(owner);
         __ModelManager_init(address(0)); // Initialize with null address for namespace manager
         __TrustManager_init(minAuthoredStake);
-        __NodeManager_init_unchained(address(0), minNodeStake); // Initialize with null address for namespace manager
-        __SessionManager_init(feeToken, feeTarget);
         __Router_init_unchained();
 
         // Setup initial roles
-        _setupRole(Dtn.OWNER_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(Dtn.OWNER_ROLE, msg.sender);
         _setRoleAdmin(Dtn.SYSTEM_ADMIN_ROLE, Dtn.OWNER_ROLE);
         _setRoleAdmin(Dtn.TRUST_ADMIN_ROLE, Dtn.SYSTEM_ADMIN_ROLE);
         _setRoleAdmin(Dtn.GENERAL_ADMIN_ROLE, Dtn.SYSTEM_ADMIN_ROLE);
@@ -96,18 +104,28 @@ contract RouterUpgradeable is
     }
 
     function feeToken() public override view returns (address) {
-        return SessionManagerUpgradeable.getFeeToken();
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        return ISessionManager($.sessionManager).getFeeToken();
+    }
+
+    function feeTarget() public override view returns (address) {
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        return ISessionManager($.sessionManager).getFeeTarget();
+    }
+
+    function setDependencies(address nodeManager, address sessionManager) external onlyOwner {
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        $.nodeManager = nodeManager;
+        $.sessionManager = sessionManager;
     }
 
     /**
      * @notice Starts a new user session with specified token amount
-     * @param amount Amount of tokens to allocate for the session
      * @return sessionId Unique identifier for the created session
      */
-    function startUserSession(
-        uint256 amount
-    ) public override returns (uint256 sessionId) {
-        return SessionManagerUpgradeable._startUserSession(amount);
+    function startUserSession() public override returns (uint256 sessionId) {
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        return ISessionManager($.sessionManager).startUserSession(msg.sender);
     }
 
     /**
@@ -115,7 +133,8 @@ contract RouterUpgradeable is
      * @param sessionId ID of the session to close
      */
     function closeUserSession(uint256 sessionId) public override {
-        return SessionManagerUpgradeable._closeUserSession(sessionId);
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        return ISessionManager($.sessionManager).closeUserSession(sessionId, msg.sender);
     }
 
     // IDtnAi Implementation
@@ -131,7 +150,7 @@ contract RouterUpgradeable is
         RouterStorageV001 storage $ = getRouterStorageV001();
 
         // Verify session using SessionManager's getSessionById
-        Session memory session = getSessionById(sessionId);
+        ISessionManager.Session memory session = ISessionManager($.sessionManager).getSessionById(sessionId);
         require(session.owner == msg.sender, "Session not related to the user");
         require(msg.value >= callbackGas, "Insufficient callback gas");
 
@@ -168,6 +187,7 @@ contract RouterUpgradeable is
         bytes32[] memory trustNamespaceIds,
         bytes32[] memory trustedNodeIds
     ) internal view returns (bool) {
+        RouterStorageV001 storage $ = getRouterStorageV001();
         if (trustedNodeIds.length > 0) {
             for (uint256 i = 0; i < trustedNodeIds.length; i++) {
                 if (trustedNodeIds[i] == nodeId) {
@@ -177,8 +197,8 @@ contract RouterUpgradeable is
         }
         for (uint256 i = 0; i < trustNamespaceIds.length; i++) {
             bytes32 namespaceId = trustNamespaceIds[i];
-            if (NodeManagerUpgradeable(address(this)).nodeHasTrustNamespace(nodeId, namespaceId)) {
-                uint256 expiration = NodeManagerUpgradeable(address(this)).nodeTrustNamespaceExpiration(nodeId, namespaceId);
+            if (INodeManager($.nodeManager).nodeHasTrustNamespace(nodeId, namespaceId)) {
+                uint256 expiration = INodeManager($.nodeManager).nodeTrustNamespaceExpiration(nodeId, namespaceId);
                 if (block.timestamp <= expiration) {
                     return true;
                 }
@@ -252,7 +272,7 @@ contract RouterUpgradeable is
         require(!requestData.completed, "Request already completed");
         require(!$.nodeResponded[requestId][nodeId], "Node already responded");
         // Get node info
-        NodeData memory node = this.getNode(nodeId);
+        INodeManager.NodeData memory node = INodeManager($.nodeManager).getNode(nodeId);
         require(node.worker == msg.sender, "Not the node worker");
         require(node.isActive, "Node not active");
         // Verify node has required trust namespace using efficient lookup
@@ -263,7 +283,7 @@ contract RouterUpgradeable is
 
         // Verify node serves the requested model using efficient lookup
         require(
-            NodeManagerUpgradeable(address(this)).nodeServesModel(nodeId, requestData.modelId),
+            INodeManager($.nodeManager).nodeServesModel(nodeId, requestData.modelId),
             "Node does not serve requested model"
         );
 
@@ -281,7 +301,7 @@ contract RouterUpgradeable is
 
         // Charge the session for both request and response fees
         uint256 totalFee = requestFee + responseFee;
-        SessionManagerUpgradeable.chargeUserSession(requestData.sessionId, totalFee, msg.sender);
+        ISessionManager($.sessionManager).chargeUserSession(requestData.sessionId, totalFee, msg.sender);
 
         // Create and add response
         IDtnAi.Response memory newResponse = _createResponse(status, message, response, nodeId);
@@ -317,15 +337,15 @@ contract RouterUpgradeable is
         returns (uint256 status, string memory message, string memory response)
     {
         RouterStorageV001 storage $ = getRouterStorageV001();
-        Request storage request = $.requests[requestId];
-        require(request.completed, "Request not completed");
+        Request storage _request = $.requests[requestId];
+        require(_request.completed, "Request not completed");
 
         // If we have a final response (aggregated), return it
-        if (request.finalResponse.nodeId != bytes32(0)) {
+        if (_request.finalResponse.nodeId != bytes32(0)) {
             return (
-                request.finalResponse.status,
-                request.finalResponse.message,
-                request.finalResponse.response
+                _request.finalResponse.status,
+                _request.finalResponse.message,
+                _request.finalResponse.response
             );
         }
 
@@ -341,9 +361,5 @@ contract RouterUpgradeable is
         address /*newImplementation*/
     ) internal view override {
         require(hasRole(Dtn.OWNER_ROLE, msg.sender), "Not authorized");
-    }
-
-    function getNodeModels(bytes32 nodeId) external view override returns (bytes32[] memory) {
-        return NodeManagerUpgradeable.getNodeStorageV001().nodeModels[nodeId];
     }
 }

@@ -3,9 +3,11 @@ pragma solidity ^0.8.0;
 
 import "../../utils/with-dtn-ai.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../../utils/dtn-defaults.sol";
 
 contract CallAiExample is WithDtnAi {
+    using SafeERC20 for IERC20;
     event Result(bytes32 requestId, uint256 status, string message, string result);
     event Error(bytes32 requestId);
 
@@ -20,8 +22,9 @@ contract CallAiExample is WithDtnAi {
     function doCallAi(string memory prompt) public payable {
         if (sessionId == 0) {
             uint amount = 1*10**18;
-            IERC20(ai.feeToken()).approve(address(ai), amount);
-            sessionId = ai.startUserSession(amount);
+            IERC20( ai.feeToken() ).safeTransferFrom(
+            msg.sender, ai.feeTarget(), amount);
+            sessionId = ai.startUserSession();
         }
 
         ai.request(

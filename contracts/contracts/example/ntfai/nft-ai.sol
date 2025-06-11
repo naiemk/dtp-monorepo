@@ -5,8 +5,8 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721Enumer
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721BurnableUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "../../core/multiowner-base.sol";
 import "../../utils/dtn-defaults.sol";
@@ -67,7 +67,7 @@ contract NftAi is
         __ERC721Enumerable_init();
         __ERC721URIStorage_init();
         __ERC721Burnable_init();
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
         __Pausable_init();
         __WithDtnAi_init(router);
@@ -81,7 +81,7 @@ contract NftAi is
 
     function startSession(uint256 amount) external onlyOwner {
         // No need to transfer tokens here as it's handled in startUserSession
-        sessionId = ai().startUserSession(amount);
+        sessionId = ai().startUserSession();
     }
 
     function closeSession() external onlyOwner {
@@ -216,7 +216,7 @@ contract NftAi is
         require(msg.value >= minPrice, "Insufficient payment");
         
         // Ensure token ID hasn't been minted yet
-        require(!_exists(tokenId), "Token already exists");
+        // require(!_exists(tokenId), "Token already exists");
         
         // Generate AI content based on prompt
         string memory imageUri = generateAIContent(prompt);
@@ -252,20 +252,6 @@ contract NftAi is
         require(success, "Transfer failed");
     }
 
-    // Override required functions for compatibility
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        uint256 tokenId,
-        uint256 batchSize
-    ) internal virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
-        super._beforeTokenTransfer(from, to, tokenId, batchSize);
-    }
-
-    function _burn(uint256 tokenId) internal virtual override(ERC721Upgradeable, ERC721URIStorageUpgradeable) {
-        super._burn(tokenId);
-    }
-
     function tokenURI(uint256 tokenId) public view virtual override(ERC721Upgradeable, ERC721URIStorageUpgradeable) returns (string memory) {
         return super.tokenURI(tokenId);
     }
@@ -282,5 +268,14 @@ contract NftAi is
         returns (bool) 
     {
         return super.supportsInterface(interfaceId);
+    }
+
+    // Override required functions for compatibility
+    function _update(address to, uint256 tokenId, address auth) internal virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (address) {
+        return super._update(to, tokenId, auth);
+    }
+
+    function _increaseBalance(address account, uint128 amount) internal virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
+        super._increaseBalance(account, amount);
     }
 }

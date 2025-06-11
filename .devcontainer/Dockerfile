@@ -21,7 +21,10 @@ RUN npm install -g yarn \
     && curl -fsSL https://bun.sh/install | bash
 
 # Set up custom prompt
-RUN echo 'export PS1="\[\033[1;36m\]\w\[\033[0m\] \[\033[1;32m\]\$(git branch 2>/dev/null | sed -n "s/^\* \(.*\)/\1/p")\[\033[0m\] \[\033[1;33m\]➜\[\033[0m\] "' >> /root/.bashrc
+RUN echo 'alias nh="npx hardhat"' >> /home/node/.bashrc
+RUN echo 'alias nhc="clear && npx hardhat compile"' >> /home/node/.bashrc
+RUN echo 'alias nht="clear && npx hardhat test"' >> /home/node/.bashrc
+RUN echo 'alias c="clear"' >> /home/node/.bashrc
 
 # Set working directory
 WORKDIR /workspace

@@ -3,8 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./inode-manager.sol";
 import "../core/dtn.sol";
@@ -14,12 +13,11 @@ import "../core/inamespace-manager.sol";
  * @title NodeManager
  * @notice Implementation of node management functionality for DeepTrust Network
  */
-abstract contract NodeManagerUpgradeable is 
-    INodeManager,
+contract NodeManagerUpgradeable is 
     Initializable,
     UUPSUpgradeable,
+    INodeManager,
     AccessControlUpgradeable,
-    PausableUpgradeable,
     ReentrancyGuardUpgradeable
 {
     using ECDSA for bytes32;
@@ -54,12 +52,11 @@ abstract contract NodeManagerUpgradeable is
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        _disableInitializers();
+        // _disableInitializers();
     }
 
     function initialize(address namespaceManager, uint256 minStakeAmount_) public initializer {
         __AccessControl_init();
-        __Pausable_init();
         __ReentrancyGuard_init();
         __NodeManager_init_unchained(namespaceManager, minStakeAmount_);
     }
@@ -328,5 +325,9 @@ abstract contract NodeManagerUpgradeable is
 
     function _authorizeUpgrade(address /*newImplementation*/) internal virtual override view {
         require(hasRole(Dtn.OWNER_ROLE, msg.sender), "Not authorized");
+    }
+
+    function getNodeModels(bytes32 nodeId) external view override returns (bytes32[] memory) {
+        return getNodeStorageV001().nodeModels[nodeId];
     }
 }

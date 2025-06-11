@@ -28,8 +28,8 @@ abstract contract MultiOwnerBase is OwnableUpgradeable {
         }
     }
 
-    function __MultiOwnerBase_init() internal onlyInitializing {
-        __Ownable_init();
+    function __MultiOwnerBase_init(address _owner) internal onlyInitializing {
+        __Ownable_init(_owner);
     }
 
     function __MultiOwnerBase_init_unchained() internal onlyInitializing {

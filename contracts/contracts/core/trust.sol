@@ -9,7 +9,7 @@ import "./dtn.sol";
  * @title TrustManagerUpgradeable
  * @notice Manages trust namespaces and their associated functionality
  */
-contract TrustManagerUpgradeable is Initializable, AccessControlUpgradeable {
+contract TrustManagerUpgradeable is /* Initializable, */ AccessControlUpgradeable {
     /// @custom:storage-location erc7201:dtn.storage.trust.001
     struct TrustStorageV001 {
         mapping(bytes32 => Dtn.TrustNamespace) trustNamespaces;

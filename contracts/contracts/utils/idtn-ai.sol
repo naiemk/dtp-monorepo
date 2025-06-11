@@ -67,10 +67,9 @@ interface IDtnAi is IDtnAiModels {
 
     /**
      * @notice Starts a new user session with specified token amount
-     * @param amount Amount of tokens to allocate for the session
      * @return sessionId Unique identifier for the created session
      */
-    function startUserSession(uint256 amount) external returns (uint256 sessionId);
+    function startUserSession() external returns (uint256 sessionId);
 
     /**
      * @notice Closes an active user session
@@ -132,4 +131,6 @@ interface IDtnAi is IDtnAiModels {
     ) external;
 
     function feeToken() external view returns (address);
+
+    function feeTarget() external view returns (address);
 }

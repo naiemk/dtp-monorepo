@@ -5,18 +5,15 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../core/multiowner-base.sol";
+import "./isession-manager.sol";
+import "hardhat/console.sol";
 
 /**
  * @title SessionManager
  * @notice SessionManager is responsible for managing sessions
  */
-contract SessionManagerUpgradeable is Initializable, MultiOwnerBase {
+contract SessionManagerUpgradeable is Initializable, MultiOwnerBase, ISessionManager {
     using SafeERC20 for IERC20;
-
-    struct Session {
-        address owner;
-        uint balance;
-    }
 
     /// @custom:storage-location erc7201:dtn.storage.sessionmanager.001
     struct SessionManagerStorageV001 {
@@ -25,6 +22,7 @@ contract SessionManagerUpgradeable is Initializable, MultiOwnerBase {
         mapping(uint => Session) sessions;
         address feeToken;
         address feeTarget;
+        uint feeBalance;
     }
 
     // keccak256(abi.encode(uint256(keccak256("dtn.storage.sessionmanager.001")) - 1)) & ~bytes32(uint256(0xff))
@@ -42,11 +40,13 @@ contract SessionManagerUpgradeable is Initializable, MultiOwnerBase {
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        _disableInitializers();
+        // _disableInitializers();
     }
 
-    function initialize(address _feeToken, address _feeTarget) public virtual initializer {
+    function initialize(address _feeToken, address _feeTarget, address owner) public virtual initializer {
+        require(_feeTarget == address(this), "Use session manager as fee target");
         __SessionManager_init(_feeToken, _feeTarget);
+        __MultiOwnerBase_init(owner);
     }
 
     function __SessionManager_init(address _feeToken, address _feeTarget) internal onlyInitializing {
@@ -61,29 +61,39 @@ contract SessionManagerUpgradeable is Initializable, MultiOwnerBase {
         }
     }
 
-    function _startUserSession(uint amount) internal virtual returns (uint) {
-        if (amount == 0) revert InvalidAmount();
+    function sync(address token) internal returns (uint) {
         SessionManagerStorageV001 storage $ = _getStorage();
-        
-        bool success = IERC20($.feeToken).transferFrom(msg.sender, $.feeTarget, amount);
-        if (!success) revert TransferFailed();
-        
-        return _startSession(msg.sender, amount);
+        uint currentBalance = IERC20(token).balanceOf(address(this));
+        uint amount = currentBalance - $.feeBalance;
+        $.feeBalance = currentBalance;
+        return amount;
     }
 
-    function _closeUserSession(uint sessionId) internal virtual {
+    function sendToken(address token, address to, uint amount) internal {
+        SessionManagerStorageV001 storage $ = _getStorage();
+        $.feeBalance -= amount;
+        IERC20(token).safeTransfer(to, amount);
+    }
+
+    function startUserSession(address owner) external virtual onlyDtn returns (uint) {
+        SessionManagerStorageV001 storage $ = _getStorage();
+        uint amount = sync($.feeToken);
+        if (amount == 0) revert InvalidAmount();
+        return _startSession(owner, amount);
+    }
+
+    function closeUserSession(uint sessionId, address owner) external virtual onlyDtn override {
         Session memory session = getSessionById(sessionId);
-        if (session.owner != msg.sender) revert Unauthorized(msg.sender, session.owner);
+        if (session.owner != owner) revert Unauthorized(msg.sender, session.owner);
         uint remainingBalance = _closeSession(sessionId);
         
         if (remainingBalance > 0) {
             SessionManagerStorageV001 storage $ = _getStorage();
-            bool success = IERC20($.feeToken).transfer(msg.sender, remainingBalance);
-            if (!success) revert TransferFailed();
+            sendToken($.feeToken, msg.sender, remainingBalance);
         }
     }
 
-    function chargeUserSession(uint sessionId, uint amount, address to) public virtual onlyDtn {
+    function chargeUserSession(uint sessionId, uint amount, address to) public virtual override onlyDtn {
         Session memory session = getSessionById(sessionId);
         if (session.owner != msg.sender) revert Unauthorized(msg.sender, session.owner);
         _chargeSession(sessionId, amount, to);
@@ -114,8 +124,7 @@ contract SessionManagerUpgradeable is Initializable, MultiOwnerBase {
         }
         
         session.balance -= amount;
-        
-        IERC20($.feeToken).safeTransfer(to, amount);
+        sendToken($.feeToken, to, amount);
         
         emit SessionCharged(sessionId, amount, to);
     }
