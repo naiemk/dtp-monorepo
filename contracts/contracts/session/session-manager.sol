@@ -93,9 +93,7 @@ contract SessionManagerUpgradeable is Initializable, MultiOwnerBase, ISessionMan
         }
     }
 
-    function chargeUserSession(uint sessionId, uint amount, address to) public virtual override onlyDtn {
-        Session memory session = getSessionById(sessionId);
-        if (session.owner != msg.sender) revert Unauthorized(msg.sender, session.owner);
+    function chargeUserSession(uint sessionId, uint amount, address to) external virtual override onlyDtn {
         _chargeSession(sessionId, amount, to);
     }
 

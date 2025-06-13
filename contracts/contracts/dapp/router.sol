@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../model/model-manager.sol";
@@ -26,6 +27,7 @@ contract RouterUpgradeable is
     MultiOwnerBase,
     ModelManagerUpgradeable,
     TrustManagerUpgradeable,
+    ReentrancyGuardUpgradeable,
     IDtnAi
 {
     using SafeERC20 for IERC20;
@@ -77,9 +79,10 @@ contract RouterUpgradeable is
     ) public initializer {
         __AccessControl_init();
         __MultiOwnerBase_init(owner);
-        __ModelManager_init(address(0)); // Initialize with null address for namespace manager
+        __ModelManager_init(); // Initialize with null address for namespace manager
         __TrustManager_init(minAuthoredStake);
         __Router_init_unchained();
+        __ReentrancyGuard_init();
 
         // Setup initial roles
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -113,10 +116,13 @@ contract RouterUpgradeable is
         return ISessionManager($.sessionManager).getFeeTarget();
     }
 
-    function setDependencies(address nodeManager, address sessionManager) external onlyOwner {
+    function setDependencies(address nodeManager, address sessionManager, address namespaceManager) external onlyOwner {
         RouterStorageV001 storage $ = getRouterStorageV001();
         $.nodeManager = nodeManager;
         $.sessionManager = sessionManager;
+
+        //model manager
+        _setDependencies(namespaceManager);
     }
 
     /**
@@ -153,6 +159,7 @@ contract RouterUpgradeable is
         ISessionManager.Session memory session = ISessionManager($.sessionManager).getSessionById(sessionId);
         require(session.owner == msg.sender, "Session not related to the user");
         require(msg.value >= callbackGas, "Insufficient callback gas");
+        require(IModelManager(address(this)).modelExists(_modelId), "Model does not exist");
 
         bytes32 requestId = keccak256(
             abi.encodePacked(block.timestamp, sessionId, user, msg.sender)
@@ -265,7 +272,7 @@ contract RouterUpgradeable is
         bytes32 nodeId,
         uint256 requestSize,
         uint256 responseSize
-    ) external {
+    ) external nonReentrant {
         RouterStorageV001 storage $ = getRouterStorageV001();
         Request storage requestData = $.requests[requestId];
         {
@@ -273,6 +280,7 @@ contract RouterUpgradeable is
         require(!$.nodeResponded[requestId][nodeId], "Node already responded");
         // Get node info
         INodeManager.NodeData memory node = INodeManager($.nodeManager).getNode(nodeId);
+        console.log("node.worker", node.worker);
         require(node.worker == msg.sender, "Not the node worker");
         require(node.isActive, "Node not active");
         // Verify node has required trust namespace using efficient lookup

@@ -27,10 +27,12 @@ contract CallAiExample is WithDtnAi {
             sessionId = ai.startUserSession();
         }
 
-        ai.request(
+        bytes32[] memory nodes = new bytes32[](1);
+        nodes[0] = keccak256(abi.encodePacked("node.tester.node1")); // Allow custom nodes to respond
+        requestId = ai.request(
             sessionId,
-            "system.models.openai.gpt-4",
-            DtnDefaults.defaultRoutingSystemValidatedAny(),
+            keccak256(abi.encodePacked("model.system.openai-gpt-4")), // the model ID
+            DtnDefaults.defaultCustomNodesValidatedAny(nodes),
             IDtnAi.DtnRequest({
                 call: abi.encode("text", prompt, "", bytes("")),
                 calltype: IDtnAi.CallType.DIRECT, 

@@ -6,11 +6,23 @@ import "./idtn-ai.sol";
 library DtnDefaults {
     function defaultRoutingSystemValidatedAny() internal pure returns (IDtnAi.DtnRouting memory) {
         bytes32[] memory namespaces = new bytes32[](1);
-        namespaces[0] = keccak256(abi.encode("system.routing.validated.any"));
+        namespaces[0] = keccak256(abi.encode("trust.system.authored"));
         
         return IDtnAi.DtnRouting({
             trustNamespaceIds: namespaces,
             trustedNodeIds: new bytes32[](0),
+            redundancy: 1,
+            confidenceLevel: 8,
+            aggregationType: IDtnAi.AggregationType.ANY
+        });
+    }
+
+    function defaultCustomNodesValidatedAny(bytes32[] memory customNodes) internal pure returns (IDtnAi.DtnRouting memory) {
+        bytes32[] memory namespaces = new bytes32[](0);
+        
+        return IDtnAi.DtnRouting({
+            trustNamespaceIds: namespaces,
+            trustedNodeIds: customNodes,
             redundancy: 1,
             confidenceLevel: 8,
             aggregationType: IDtnAi.AggregationType.ANY

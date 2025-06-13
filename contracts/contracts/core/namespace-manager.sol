@@ -24,6 +24,10 @@ contract NamespaceManager is Initializable, MultiOwnerBase, INamespaceManager {
 
     function __NamespaceManager_init(address _owner) internal onlyInitializing {
         __MultiOwnerBase_init(_owner);
+        _registerNamespace("model.system", address(0));
+        _registerNamespace("node.system", address(0));
+        _registerNamespace("trust.system", address(0));
+        _registerNamespace("api.system", address(0));
     }
 
     function __NamespaceManager_init_unchained() internal onlyInitializing {
@@ -38,7 +42,8 @@ contract NamespaceManager is Initializable, MultiOwnerBase, INamespaceManager {
 
     /// @inheritdoc INamespaceManager
     function getNamespaceOwner(bytes32 namespaceId) external view override returns (address) {
-        return _getStorage().namespaces[namespaceId].owner;
+        NamespaceManagerStorageV001 storage $ = _getStorage();
+        return $.namespaces[namespaceId].owner;
     }
 
     /// @inheritdoc INamespaceManager
@@ -51,10 +56,23 @@ contract NamespaceManager is Initializable, MultiOwnerBase, INamespaceManager {
         $.namespaces[namespaceId] = NamespaceConfig({
             owner: owner,
             namespaceId: namespaceId,
-            namespace: "" // Namespace string is not stored to save gas
+            namespace: namespace // Namespace string is not stored to save gas
         });
 
             emit NamespaceRegistered(namespace, namespaceId, owner);
+    }
+
+    function _registerNamespace(string memory namespace, address owner) internal {
+        NamespaceManagerStorageV001 storage $ = _getStorage();
+        bytes32 namespaceId = keccak256(abi.encodePacked(namespace));
+        require($.namespaces[namespaceId].owner == address(0), "NamespaceManager: namespace already exists");
+        
+        $.namespaces[namespaceId] = NamespaceConfig({
+            owner: owner,
+            namespaceId: namespaceId,
+            namespace: namespace // Namespace string is not stored to save gas
+        });
+        emit NamespaceRegistered(namespace, namespaceId, owner);
     }
 
     /// @dev Event emitted when a new namespace is registered

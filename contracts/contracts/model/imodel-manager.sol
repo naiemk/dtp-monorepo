@@ -55,4 +55,9 @@ interface IModelManager {
     /// @param modelId The unique identifier for the model
     /// @return modelConfig The model configuration
     function getModelConfig(bytes32 modelId) external view returns (ModelConfig memory);
+
+    /// @notice Check if a model exists
+    /// @param modelId The unique identifier for the model
+    /// @return exists True if the model exists, false otherwise
+    function modelExists(bytes32 modelId) external view returns (bool);
 }

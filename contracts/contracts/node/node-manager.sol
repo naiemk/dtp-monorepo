@@ -8,6 +8,7 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./inode-manager.sol";
 import "../core/dtn.sol";
 import "../core/inamespace-manager.sol";
+import "hardhat/console.sol";
 
 /**
  * @title NodeManager
@@ -100,11 +101,14 @@ contract NodeManagerUpgradeable is
         address worker
     ) external payable override {
         NodeStorageV001 storage $ = getNodeStorageV001();
-        require(msg.value >= $.minStakeAmount, "Insufficient stake");
+        // require(msg.value >= $.minStakeAmount, "Insufficient stake");
         string memory parentNamespace = string.concat("node.", username);
         string memory nodeNamespace = string.concat(parentNamespace, ".", nodeName);
         bytes32 parentNamespaceId = keccak256(abi.encodePacked(parentNamespace));
         bytes32 nodeNamespaceId = keccak256(abi.encodePacked(nodeNamespace));
+        console.log(nodeNamespace);
+        console.log("nodeNamespaceId");
+        console.logBytes32(nodeNamespaceId);
         require($.nodes[nodeNamespaceId].owner == address(0), "Node already exists");
 
         // Verify the caller owns the node namespace

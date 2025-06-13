@@ -28,17 +28,14 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDt
     // keccak256(abi.encode(uint256(keccak256("dtn.storage.modelmanager.001")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant ModelStorageV001Location = 0x317ad3d122488b64c2d86bf285bd2d0e9a7289d8b50201f32d6abb04fde8a300;
 
-    function __ModelManager_init(address _namespaceManager) internal onlyInitializing {
+    function __ModelManager_init() internal onlyInitializing {
         __AccessControl_init();
-        __ModelManager_init_unchained(_namespaceManager);
+        __ModelManager_init_unchained();
     }
 
-    function __ModelManager_init_unchained(address _namespaceManager) internal onlyInitializing {
+    function __ModelManager_init_unchained() internal onlyInitializing {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(NAMESPACE_ADMIN_ROLE, msg.sender);
-        
-        ModelManagerStorageV001 storage $ = getModelStorageV001();
-        $.namespaceManager = _namespaceManager;
     }
 
     function getModelStorageV001() internal pure returns (ModelManagerStorageV001 storage $) {
@@ -46,6 +43,12 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDt
             $.slot := ModelStorageV001Location
         }
     }
+
+    function _setDependencies(address _namespaceManager) internal virtual {
+        ModelManagerStorageV001 storage $ = getModelStorageV001();
+        $.namespaceManager = _namespaceManager;
+    }
+
 
     /**
      * @notice Register a model API for a namespace
@@ -134,6 +137,16 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDt
     function getModelConfig(bytes32 _modelId) external view override returns (ModelConfig memory) {
         ModelManagerStorageV001 storage $ = getModelStorageV001();
         return $.modelsById[_modelId];
+    }
+
+    /**
+     * @notice Check if a model exists
+     * @param _modelId The unique identifier for the model
+     * @return exists True if the model exists, false otherwise
+     */
+    function modelExists(bytes32 _modelId) external view override returns (bool) {
+        ModelManagerStorageV001 storage $ = getModelStorageV001();
+        return $.modelsById[_modelId].modelId != bytes32(0);
     }
 
     /**

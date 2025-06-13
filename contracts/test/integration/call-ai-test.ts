@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { Contract, Signer } from "ethers";
+import { Contract, keccak256, Signer } from "ethers";
 import { RouterUpgradeable } from "../../typechain-types";
 import { MockERC20 } from "../../typechain-types";
 import { CallAiExample } from "../../typechain-types";
@@ -9,8 +9,11 @@ import { NamespaceManager } from "../../typechain-types";
 import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { SessionManagerUpgradeable } from "../../typechain-types";
 
+const abi = ethers.AbiCoder.defaultAbiCoder();
+
 interface TestContext {
   owner: HardhatEthersSigner;
+  acc1: HardhatEthersSigner;
   router: RouterUpgradeable;
   token: MockERC20;
   callAi: CallAiExample;
@@ -19,7 +22,7 @@ interface TestContext {
 }
 
 async function deployRouter() {
-  const [owner] = await ethers.getSigners();
+  const [owner, acc1] = await ethers.getSigners();
   
   // Deploy and configure the contracts
   const tokenF = await ethers.getContractFactory("MockERC20");
@@ -30,6 +33,7 @@ async function deployRouter() {
   const namespaceManagerF = await ethers.getContractFactory("NamespaceManager");
   const namespaceManager = await namespaceManagerF.deploy() as NamespaceManager;
   await namespaceManager.initialize(owner.address);
+  console.log('NS OWNER', await namespaceManager.getNamespaceOwner(keccak256(abi.encode(['string'], ['model.system']))));
   
   // Deploy NodeManager
   const nodeManagerF = await ethers.getContractFactory("NodeManagerUpgradeable");
@@ -53,14 +57,19 @@ async function deployRouter() {
   );
   
   // Set up dependencies
-  await router.setDependencies(nodeManager.target, sessionManager.target);
-  await sessionManager.addDtnContracts([router.target, sessionManager.target]);
-  
+  await router.setDependencies(nodeManager.target, sessionManager.target, namespaceManager.target);
+  await router.grantRole(await router.NAMESPACE_ADMIN_ROLE(), owner.address);
+  await sessionManager.addDtnContracts([router.target]);
+  await namespaceManager.addDtnContracts([router.target, sessionManager.target, nodeManager.target]);
+
+  // Register a model
+  await router.registerModel('model.system', 'openai-gpt-4');
+
   // Deploy CallAiExample
   const callAiF = await ethers.getContractFactory("CallAiExample");
   const callAi = await callAiF.deploy(router.target) as CallAiExample;
   
-  return { owner, router, token, callAi, nodeManager, namespaceManager } as TestContext;
+  return { owner, acc1, router, token, callAi, nodeManager, namespaceManager } as TestContext;
 }
 
 describe("Run and end-to-end call ai and print result", function () {
@@ -80,11 +89,28 @@ describe("Run and end-to-end call ai and print result", function () {
     });
 
     it("Should call ai and print result", async function () {
-      // const ctx = await deployRouter();
-      // await ctx.callAi.doCallAi("What is A+B, if A=10 and B=12. Write only one single number as response.", {
-      //   value: ethers.parseEther("0.0001") });
+      const ctx = await deployRouter();
+      console.log(`Register a node`);
+      await ctx.nodeManager.registerUser("tester", ctx.acc1.address);
+      await ctx.nodeManager.registerNode("tester", "node1", ctx.acc1.address);
+      const nodeId = ethers.solidityPackedKeccak256(['string'], ['node.tester.node1']);
+      await ctx.nodeManager.setNodeModels(nodeId, [ethers.solidityPackedKeccak256(['string'], ['model.system.openai-gpt-4'])]);
 
-      // TODO: we need to register node, and model, etc. then use the node worker, to response to the 
-      // request.
+      await ctx.token.approve(ctx.callAi.target, ethers.parseEther("100"));
+      await ctx.callAi.doCallAi("What is A+B, if A=10 and B=12. Write only one single number as response.", {
+        value: ethers.parseEther("0.0001") });
+
+      await ctx.callAi.doCallAi("What is A+B, if A=10 and B=12. Write only one single number as response.", {
+        value: ethers.parseEther("0.0001") });
+
+      console.log(`Now we will act as the node: worker is: ${ctx.acc1.address}`);
+      await ctx.router.connect(ctx.acc1).respondToRequest(
+        await ctx.callAi.requestId(),
+        1, // success
+        'successful response',
+        '12',
+        nodeId,
+        0,
+        0);
     });
 }); 
