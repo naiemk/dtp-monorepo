@@ -49,7 +49,7 @@ interface IDtnAi is IDtnAiModels {
      * @notice Structure for AI response
      */
     struct Response {
-        uint256 status;      // Response status code
+        ResponseStatus status;      // Response status code
         string message;      // Additional message or error details
         string response;     // The actual response data
         bytes32 nodeId;      // ID of the node that provided the response
@@ -60,9 +60,15 @@ interface IDtnAi is IDtnAiModels {
      * @notice Callback structure for handling AI responses
      */
     struct CallBack {
-        address target;     // Contract to call back
-        bytes4 success;     // Function selector for successful response
+        bytes4 suscess;     // Function selector for successful response
         bytes4 failure;     // Function selector for failed response
+        address target;     // Contract to call back
+    }
+
+    enum ResponseStatus {
+        NA,
+        SUCCESS,
+        FAILURE
     }
 
     /**
@@ -105,7 +111,7 @@ interface IDtnAi is IDtnAiModels {
      * @return response The actual response data
      */
     function fetchResponse(bytes32 requestId) external view returns (
-        uint256 status,
+        ResponseStatus status,
         string memory message,
         string memory response
     );
@@ -122,7 +128,7 @@ interface IDtnAi is IDtnAiModels {
      */
     function respondToRequest(
         bytes32 requestId,
-        uint256 status,
+        ResponseStatus status,
         string memory message,
         string memory response,
         bytes32 nodeId,

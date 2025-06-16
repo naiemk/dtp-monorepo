@@ -35,7 +35,7 @@ contract TrustManagerUpgradeable is /* Initializable, */ AccessControlUpgradeabl
 
     function registerAuthoredTrustNamespace(string memory namespace, address nodeSelector) external payable {
         TrustStorageV001 storage $ = getTrustStorageV001();
-        require(msg.value >= $.minAuthoredStake, "Insufficient stake");
+        // require(msg.value >= $.minAuthoredStake, "Insufficient stake");
         require(Dtn.isAuthoredNamespace(namespace), "Invalid authored namespace prefix");
         
         $.trustNamespaces[keccak256(abi.encode(namespace))] = Dtn.TrustNamespace({

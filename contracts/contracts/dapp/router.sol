@@ -28,7 +28,8 @@ contract RouterUpgradeable is
     ModelManagerUpgradeable,
     TrustManagerUpgradeable,
     ReentrancyGuardUpgradeable,
-    IDtnAi
+    IDtnAi,
+    IResponseStrategy
 {
     using SafeERC20 for IERC20;
     /// @custom:storage-location erc7201:dtn.storage.router.001
@@ -64,8 +65,8 @@ contract RouterUpgradeable is
         uint256 indexed sessionId,
         address indexed user
     );
-    event RequestCompleted(bytes32 indexed requestId, uint256 status);
-    event ResponseReceived(bytes32 indexed requestId, bytes32 indexed nodeId, uint256 status);
+    event RequestCompleted(bytes32 indexed requestId, ResponseStatus status);
+    event ResponseReceived(bytes32 indexed requestId, bytes32 indexed nodeId, ResponseStatus status);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -176,7 +177,7 @@ contract RouterUpgradeable is
             callbackGas: callbackGas,
             responseCount: 0,
             finalResponse: IDtnAi.Response({
-                status: 0,
+                status: ResponseStatus.SUCCESS,
                 message: "",
                 response: "",
                 nodeId: bytes32(0),
@@ -215,7 +216,7 @@ contract RouterUpgradeable is
     }
 
     function _createResponse(
-        uint256 status,
+        ResponseStatus status,
         string memory message,
         string memory response,
         bytes32 nodeId
@@ -233,10 +234,11 @@ contract RouterUpgradeable is
         bytes32 requestId,
         Request storage requestData,
         RouterStorageV001 storage $,
-        uint256 status
+        ResponseStatus status
     ) internal {
         // Get response strategy based on routing type
         IResponseStrategy strategy = IResponseStrategy(getResponseStrategy(requestData.routing.aggregationType));
+        requestData.completed = true;
         
         // Extract final response
         IDtnAi.Response memory finalResponse = strategy.extractSingleResponse(
@@ -246,19 +248,20 @@ contract RouterUpgradeable is
 
         // Store the final response and mark as completed
         requestData.finalResponse = finalResponse;
-        requestData.completed = true;
 
+        console.log("Callback gas", requestData.callbackGas);
+        console.log("Callback", requestData.callback.target);
         // Call callback
-        if (status == 0) { // Success
+        if (status == ResponseStatus.SUCCESS) { // Success
             (bool success, ) = requestData.callback.target.call{gas: requestData.callbackGas}(
-                abi.encodeWithSelector(requestData.callback.success, requestId)
+                abi.encodeWithSelector(requestData.callback.suscess, requestId)
             );
-            require(success, "Callback failed");
+            require(success, "Success callback failed");
         } else { // Failure
             (bool success, ) = requestData.callback.target.call{gas: requestData.callbackGas}(
                 abi.encodeWithSelector(requestData.callback.failure, requestId)
             );
-            require(success, "Callback failed");
+            require(success, "Failure callback failed");
         }
 
         emit RequestCompleted(requestId, status);
@@ -266,7 +269,7 @@ contract RouterUpgradeable is
 
     function respondToRequest(
         bytes32 requestId,
-        uint256 status,
+        ResponseStatus status,
         string memory message,
         string memory response,
         bytes32 nodeId,
@@ -333,7 +336,30 @@ contract RouterUpgradeable is
     function getResponseStrategy(AggregationType aggregationType) internal view returns (address) {
         // TODO: Implement strategy selection based on aggregation type
         // For now, return a default strategy
-        return address(0);
+        if (aggregationType == AggregationType.ANY) {
+            return address(this);
+        }
+
+        revert("Response strategy not implemented");
+    }
+
+    /**
+     * @notice Extracts a single response from the responses array
+     * @param requestId The ID of the request
+     * @param responses The array of responses
+     * @return response The single response
+     */
+    function extractSingleResponse(
+        bytes32 requestId,
+        IDtnAi.Response[] memory responses
+    ) public view override returns (IDtnAi.Response memory response) {
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        Request storage _request = $.requests[requestId];
+        require(_request.completed, "Request not completed");
+        require(_request.responseCount == 1, "No responses found or multiple responses without aggregation");
+        require($.nodeResponded[requestId][responses[0].nodeId], "Node did not respond");
+        require(responses[0].status == ResponseStatus.SUCCESS, "Response status is not success");
+        response = $.responses[requestId][0];
     }
 
     function fetchResponse(
@@ -342,7 +368,7 @@ contract RouterUpgradeable is
         external
         view
         override
-        returns (uint256 status, string memory message, string memory response)
+        returns (IDtnAi.ResponseStatus status, string memory message, string memory response)
     {
         RouterStorageV001 storage $ = getRouterStorageV001();
         Request storage _request = $.requests[requestId];

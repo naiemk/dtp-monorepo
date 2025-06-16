@@ -127,9 +127,9 @@ contract NftAi is
         );
 
         IDtnAi.CallBack memory callback = IDtnAi.CallBack(
-            address(this),
             this.createNftMetadataFromImage.selector,
-            this.aiError.selector
+            this.aiError.selector,
+            address(this)
         );
 
         IDtnAi.DtnRequest memory dtnRequest = IDtnAi.DtnRequest({
@@ -166,9 +166,9 @@ contract NftAi is
         );
 
         IDtnAi.CallBack memory callback = IDtnAi.CallBack(
-            address(this),
             this.mintNft.selector,
-            this.aiError.selector
+            this.aiError.selector,
+            address(this)
         );
 
         bytes32 nextRequestId = ai().request{value: CREATE_METADATA_CALLBACK_GAS}(

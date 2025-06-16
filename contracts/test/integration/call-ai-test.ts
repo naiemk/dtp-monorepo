@@ -103,7 +103,7 @@ describe("Run and end-to-end call ai and print result", function () {
       await ctx.callAi.doCallAi("What is A+B, if A=10 and B=12. Write only one single number as response.", {
         value: ethers.parseEther("0.0001") });
 
-      console.log(`Now we will act as the node: worker is: ${ctx.acc1.address}`);
+      console.log(`Now we will act as the node: worker is: ${ctx.acc1.address}, callAi is: ${ctx.callAi.target}`);
       await ctx.router.connect(ctx.acc1).respondToRequest(
         await ctx.callAi.requestId(),
         1, // success
@@ -112,5 +112,11 @@ describe("Run and end-to-end call ai and print result", function () {
         nodeId,
         0,
         0);
+
+      console.log(`Now let's check the result`);
+      const result = await ctx.callAi.result();
+      console.log(`Result: ${result}`);
+      expect(result).to.equal('12');
     });
+
 }); 

@@ -8,7 +8,7 @@ import "../../utils/dtn-defaults.sol";
 
 contract CallAiExample is WithDtnAi {
     using SafeERC20 for IERC20;
-    event Result(bytes32 requestId, uint256 status, string message, string result);
+    event Result(bytes32 requestId, IDtnAi.ResponseStatus status, string message, string result);
     event Error(bytes32 requestId);
 
     string public result;
@@ -29,7 +29,7 @@ contract CallAiExample is WithDtnAi {
 
         bytes32[] memory nodes = new bytes32[](1);
         nodes[0] = keccak256(abi.encodePacked("node.tester.node1")); // Allow custom nodes to respond
-        requestId = ai.request(
+        requestId = ai.request{value: msg.value}(
             sessionId,
             keccak256(abi.encodePacked("model.system.openai-gpt-4")), // the model ID
             DtnDefaults.defaultCustomNodesValidatedAny(nodes),
@@ -41,17 +41,17 @@ contract CallAiExample is WithDtnAi {
                 totalFeePerRes: 1 * 10**18
             }),
             IDtnAi.CallBack(
-                address(this),
                 this.callback.selector,
-                this.aiError.selector
+                this.aiError.selector,
+                address(this)
             ),
             msg.sender, 
-            0
+            msg.value
         );
     }
 
     function callback(bytes32 _requestId) external onlyDtn {
-        (uint256 status, string memory message, string memory response) = ai.fetchResponse(_requestId);
+        (IDtnAi.ResponseStatus status, string memory message, string memory response) = ai.fetchResponse(_requestId);
         result = response;
         emit Result(requestId, status, message, response);
     }
