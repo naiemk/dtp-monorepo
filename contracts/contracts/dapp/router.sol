@@ -37,6 +37,8 @@ contract RouterUpgradeable is
         // Request management
         address nodeManager;
         address sessionManager;
+        bytes32[] requestIds;
+        bytes32[] completedRequestIds;
         mapping(bytes32 => Request) requests;
         mapping(bytes32 => IDtnAi.Response[]) responses;
         mapping(bytes32 => mapping(bytes32 => bool)) nodeResponded; // requestId => nodeId => hasResponded
@@ -75,7 +77,6 @@ contract RouterUpgradeable is
 
     function initialize(
         uint256 minAuthoredStake,
-        uint256 minNodeStake,
         address owner
     ) public initializer {
         __AccessControl_init();
@@ -115,6 +116,39 @@ contract RouterUpgradeable is
     function feeTarget() public override view returns (address) {
         RouterStorageV001 storage $ = getRouterStorageV001();
         return ISessionManager($.sessionManager).getFeeTarget();
+    }
+
+    function getPendingRequestsLength() public view returns (uint256) {
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        return $.requestIds.length;
+    }
+
+    function getPendingRequests(uint from, uint to) public view returns (bytes32[] memory) {
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        bytes32[] memory requests = new bytes32[](to - from);
+        for (uint256 i = from; i < to; i++) {
+            requests[i - from] = $.requestIds[i];
+        }
+        return requests;
+    }
+
+    function getCompletedRequestsLength() public view returns (uint256) {
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        return $.completedRequestIds.length;
+    }
+
+    function getCompletedRequests(uint from, uint to) public view returns (bytes32[] memory) {
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        bytes32[] memory requests = new bytes32[](to - from);
+        for (uint256 i = from; i < to; i++) {
+            requests[i - from] = $.completedRequestIds[i];
+        }
+        return requests;
+    }
+
+    function getRequest(bytes32 requestId) public view returns (Request memory) {
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        return $.requests[requestId];
     }
 
     function setDependencies(address nodeManager, address sessionManager, address namespaceManager) external onlyOwner {
@@ -184,6 +218,7 @@ contract RouterUpgradeable is
                 timestamp: block.timestamp
             })
         });
+        $.requestIds.push(requestId);
 
         emit RequestCreated(requestId, sessionId, user);
 
@@ -325,6 +360,7 @@ contract RouterUpgradeable is
         // Check if we have enough responses based on routing
         if (requestData.responseCount >= requestData.routing.redundancy) {
             _handleRequestCompletion(requestId, requestData, $, status);
+            $.completedRequestIds.push(requestId);
         }
     }
 

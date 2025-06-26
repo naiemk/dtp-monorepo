@@ -21,7 +21,7 @@ model-apis:
       dimension-y: height of the image
 
 custom-models:
-  - "model.node.alice.my-custom-model":
+  - name: "model.node.alice.my-custom-model":
     api: "api.node.alice.my-custom-api"
 
 node:
@@ -29,5 +29,11 @@ node:
   nodeName: node1
   worker: 0x1234567890123456789012345678901234567890
   models:
-    - model.system.openai-gpt-4
-    - model.node.alice.my-custom-model
+    - name: model.system.openai-gpt-4
+      priceMinPerByteIn: 1000
+      priceMaxPerByteOut: 10000
+    - name: model.node.alice.my-custom-model
+      priceMinPerByteIn: 1000
+      priceMaxPerByteOut: 10000
+  trustNamespaces:
+    - "system.trust.dtn"

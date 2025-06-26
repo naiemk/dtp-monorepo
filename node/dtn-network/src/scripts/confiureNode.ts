@@ -1,6 +1,7 @@
 import fs from 'fs';
 import yaml from 'yaml';
 import { ethers } from 'ethers';
+import type { NodeConfig, ModelApiConfig, CustomModelConfig } from '../types';
 
 /**
  * This script is used to configure a node for the dtn network.
@@ -10,32 +11,6 @@ import { ethers } from 'ethers';
  * 3. Register model APIs if not already registered
  * 3. Register models
  */
-
-export interface ModelApiConfig {
-    specs: string;
-    docs: string;
-}
-
-export interface NodeConfig {
-    keys: {
-        ownerPrivateKey: string;
-        workerPrivateKey: string;
-    };
-    network: {
-        rpcUrl: string;
-        chainId: number;
-        nodeManagerAddress: string;
-        modelManagerAddress: string;
-    };
-    modelApis: { [key: string]: ModelApiConfig };
-    customModels: { [key: string]: { api: string } };
-    node: {
-        username: string;
-        nodeName: string;
-        worker: string;
-    };
-    models: string[];
-}
 
 // Contract ABIs - simplified versions for the functions we need
 const NODE_MANAGER_ABI = [
@@ -153,12 +128,12 @@ async function registerModelApisIfNotExists(ownerWallet: ethers.Wallet, modelApi
 /**
  * Register custom models if not already registered
  */
-async function registerCustomModelsIfNotExists(ownerWallet: ethers.Wallet, customModels: { [key: string]: { api: string } }, config: NodeConfig) {
+async function registerCustomModelsIfNotExists(ownerWallet: ethers.Wallet, customModels: CustomModelConfig[], config: NodeConfig) {
     console.log('Checking and registering custom models...');
     
     const modelManager = new ethers.Contract(config.network.modelManagerAddress, MODEL_MANAGER_ABI, ownerWallet);
     
-    for (const [fullModelName, modelConfig] of Object.entries(customModels)) {
+    for (const {name: fullModelName, api: modelApi} of customModels) {
         console.log(`Checking custom model '${fullModelName}'...`);
         
         try {
@@ -172,7 +147,7 @@ async function registerCustomModelsIfNotExists(ownerWallet: ethers.Wallet, custo
             const modelName = parts.pop()!; // Get the last part as model name
             const namespace = parts.join('.'); // Join remaining parts as namespace
             
-            console.log(`  Namespace: ${namespace}, Model Name: ${modelName}, API: ${modelConfig.api}`);
+            console.log(`  Namespace: ${namespace}, Model Name: ${modelName}, API: ${modelApi}`);
             
             // Check if model already exists
             const modelId = ethers.solidityPackedKeccak256(['string'], [fullModelName]);
@@ -187,7 +162,7 @@ async function registerCustomModelsIfNotExists(ownerWallet: ethers.Wallet, custo
             const tx = await modelManager.registerModel!(
                 namespace,
                 modelName,
-                modelConfig.api
+                modelApi
             );
             await tx.wait();
             console.log(`✅ Custom model '${fullModelName}' registered successfully. Transaction: ${tx.hash}`);
@@ -250,7 +225,8 @@ export async function configureNode(configPath: string) {
         await registerCustomModelsIfNotExists(ownerWallet, config.customModels, config);
         const nodeId = ethers.solidityPackedKeccak256(['string'],
             [`node.${config.node.username}.${config.node.nodeName}`]);
-        const modelIds = config.models.map(model => ethers.solidityPackedKeccak256(['string'], [model]));
+        const modelIds = config.models.map(model =>
+            ethers.solidityPackedKeccak256(['string'], [model.name]));
         await setNodeModelsIfNotSet(ownerWallet, nodeId, modelIds, config);
     } else {
         console.log('Owner private key is not set. Skipping node configuration.');
