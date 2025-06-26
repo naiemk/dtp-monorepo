@@ -17,7 +17,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Install Node package managers
 RUN npm install -g yarn \
-    && npm install -g hardhat \
+    && npm install -g hardhat bun \
     && curl -fsSL https://bun.sh/install | bash
 
 # Set up custom prompt

@@ -92,7 +92,8 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDt
      */
     function registerModel(
         string memory namespace,
-        string memory modelName
+        string memory modelName,
+        string memory modelApi
     ) external override returns (bytes32) {
         ModelManagerStorageV001 storage $ = getModelStorageV001();
 
@@ -112,6 +113,7 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDt
         $.modelsById[_modelId] = ModelConfig({
             modelNamespaceId: namespaceId,
             modelId: _modelId,
+            modelApiId: keccak256(abi.encodePacked(modelApi)),
             modelName: fullModelName
         });
 
@@ -121,12 +123,13 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDt
 
     /**
      * @notice Get the model API configuration
-     * @param apiId The unique identifier for the model API
+     * @param _modelId The unique identifier for the model
      * @return modelApi The model API configuration
      */
-    function getModelAPI(bytes32 apiId) external view override returns (ModelApi memory) {
+    function getModelAPI(bytes32 _modelId) external view override returns (ModelApi memory) {
         ModelManagerStorageV001 storage $ = getModelStorageV001();
-        return $.apisById[apiId];
+        bytes32 modelApiId = $.modelsById[_modelId].modelApiId;
+        return $.apisById[modelApiId];
     }
 
     /**

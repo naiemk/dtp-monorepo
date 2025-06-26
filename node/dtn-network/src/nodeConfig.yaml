@@ -1,0 +1,33 @@
+# This is the configuration for the node.
+# Use ENV_NAME to replace the values with environment variables for private keys.
+# OWNER_PRIVATE_KEY is optional
+keys:
+  ownerPrivateKey: OWNER_PRIVATE_KEY
+  workerPrivateKey: WORKER_PRIVATE_KEY
+
+network:
+  rpcUrl: https://rpc.dtn.network
+  chainId: 1337
+  nodeManagerAddress: 0x1234567890123456789012345678901234567890
+  modelManagerAddress: 0x1234567890123456789012345678901234567890
+
+model-apis:
+  - "api.node.alice.my-custom-api":
+    specs: "prompt: string,respnse-type: uint8,dimension-x: uint64,dimension-y: uint64"
+    docs: |
+      prompt: provide prompt
+      response-type: 0 for text, 1 for image
+      dimension-x: width of the image
+      dimension-y: height of the image
+
+custom-models:
+  - "model.node.alice.my-custom-model":
+    api: "api.node.alice.my-custom-api"
+
+node:
+  username: alice
+  nodeName: node1
+  worker: 0x1234567890123456789012345678901234567890
+  models:
+    - model.system.openai-gpt-4
+    - model.node.alice.my-custom-model

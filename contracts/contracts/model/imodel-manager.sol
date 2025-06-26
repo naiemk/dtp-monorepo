@@ -30,6 +30,7 @@ interface IModelManager {
     struct ModelConfig {
         bytes32 modelNamespaceId; // The namespace id of the model group
         bytes32 modelId;
+        bytes32 modelApiId;
         string modelName;
     }
 
@@ -43,8 +44,9 @@ interface IModelManager {
     /// @notice Register a new model in a namespace
     /// @param namespace The namespace to register the model in
     /// @param modelName The name of the model
+    /// @param modelApi The API of the model
     /// @return modelId The unique identifier for the model
-    function registerModel(string memory namespace, string memory modelName) external returns (bytes32);
+    function registerModel(string memory namespace, string memory modelName, string memory modelApi) external returns (bytes32);
 
     /// @notice Get the model API configuration
     /// @param apiId The unique identifier for the model API
