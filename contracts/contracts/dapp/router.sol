@@ -253,7 +253,7 @@ contract RouterUpgradeable is
     function _createResponse(
         ResponseStatus status,
         string memory message,
-        string memory response,
+        bytes memory response,
         bytes32 nodeId
     ) internal view returns (IDtnAi.Response memory) {
         return IDtnAi.Response({
@@ -306,7 +306,7 @@ contract RouterUpgradeable is
         bytes32 requestId,
         ResponseStatus status,
         string memory message,
-        string memory response,
+        bytes memory response,
         bytes32 nodeId,
         uint256 requestSize,
         uint256 responseSize
@@ -404,7 +404,7 @@ contract RouterUpgradeable is
         external
         view
         override
-        returns (IDtnAi.ResponseStatus status, string memory message, string memory response)
+        returns (IDtnAi.ResponseStatus status, string memory message, bytes memory response)
     {
         RouterStorageV001 storage $ = getRouterStorageV001();
         Request storage _request = $.requests[requestId];

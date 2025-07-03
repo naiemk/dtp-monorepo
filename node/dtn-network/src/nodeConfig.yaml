@@ -5,6 +5,9 @@ keys:
   ownerPrivateKey: OWNER_PRIVATE_KEY
   workerPrivateKey: WORKER_PRIVATE_KEY
 
+local:
+  cacheDir: ./.cache
+
 network:
   rpcUrl: https://rpc.dtn.network
   chainId: 1337
@@ -32,8 +35,10 @@ node:
     - name: model.system.openai-gpt-4
       priceMinPerByteIn: 1000
       priceMaxPerByteOut: 10000
+      host: "http://localproxy:8080/"
     - name: model.node.alice.my-custom-model
       priceMinPerByteIn: 1000
       priceMaxPerByteOut: 10000
+      host: "http://gpuhost:8080/"
   trustNamespaces:
     - "system.trust.dtn"

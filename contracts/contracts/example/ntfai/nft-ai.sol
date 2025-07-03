@@ -137,7 +137,8 @@ contract NftAi is
             calltype: IDtnAi.CallType.IPFS,
             feePerByteReq: 0,
             feePerByteRes: 0,
-            totalFeePerRes: 0
+            totalFeePerRes: 0,
+            extraParams: ""
         });
         bytes32 requestId = ai().request{value: CREATE_IMAGE_CALLBACK_GAS}(
             sessionId,
@@ -153,7 +154,7 @@ contract NftAi is
     }
 
     function createNftMetadataFromImage(bytes32 requestId) external onlyDtn {
-        (,,string memory ipfsCid) = ai().fetchResponse(requestId);
+        (,,bytes memory ipfsCid) = ai().fetchResponse(requestId);
         
         // Get model ID from model manager
         bytes32 metadataModelId = ai().modelId("system.models.openai.gpt-4");
@@ -175,7 +176,10 @@ contract NftAi is
             sessionId,
             metadataModelId,
             DtnDefaults.defaultRoutingSystemValidatedAny(),
-            IDtnAi.DtnRequest({ call: aiCall, calltype: IDtnAi.CallType.IPFS, feePerByteReq: 0, feePerByteRes: 0, totalFeePerRes: 0 }),
+            IDtnAi.DtnRequest({ call: aiCall,
+            calltype: IDtnAi.CallType.IPFS, feePerByteReq: 0, feePerByteRes: 0, totalFeePerRes: 0,
+            extraParams: ""
+             }),
             callback,
             msg.sender,
             CREATE_METADATA_CALLBACK_GAS
@@ -187,8 +191,8 @@ contract NftAi is
 
     function mintNft(bytes32 requestId) external onlyDtn {
         // Given the nft metadata, mint an nft
-        (,,string memory ipfsCid) = ai().fetchResponse(requestId);
-        mintTokenFromJson(requestIdToNftOwner[requestId], ipfsCid);
+        (,,bytes memory ipfsCid) = ai().fetchResponse(requestId);
+        mintTokenFromJson(requestIdToNftOwner[requestId], abi.decode(ipfsCid, (string)));
     }
 
     function aiError(bytes32 requestId) external onlyDtn {

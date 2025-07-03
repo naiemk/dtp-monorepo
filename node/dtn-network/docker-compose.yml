@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  dtn-node:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: dtn-node
+    environment:
+      - NODE_ENV=production
+      # Add your environment variables here
+      # - OWNER_PRIVATE_KEY=${OWNER_PRIVATE_KEY}
+      # - WORKER_PRIVATE_KEY=${WORKER_PRIVATE_KEY}
+    volumes:
+      # Mount config file if needed
+      - ./nodeConfig.yaml:/app/nodeConfig.yaml:ro
+      # Mount cache directory for persistence
+      - dtn-cache:/app/cache
+    restart: unless-stopped
+    # Uncomment if you need to expose ports
+    # ports:
+    #   - "3000:3000"
+
+volumes:
+  dtn-cache: 

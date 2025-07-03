@@ -1,8 +1,15 @@
 {
   "name": "dtn-network",
-  "module": "index.ts",
+  "module": "dist/index.cjs",
   "type": "module",
   "private": true,
+  "bin": {
+    "dtn-node": "./dist/index.cjs"
+  },
+  "main": "dist/index.cjs",
+  "files": [
+    "dist"
+  ],
   "devDependencies": {
     "@types/bun": "latest",
     "tsup": "^8.5.0"
@@ -12,9 +19,17 @@
   },
   "scripts": {
     "build": "tsup",
-    "dev": "bun run build --watch"
+    "dev": "bun run build --watch",
+    "start": "node dist/index.cjs",
+    "start:once": "node dist/index.cjs run-once",
+    "start:loop": "node dist/index.cjs loop",
+    "configure": "node dist/index.cjs configure-node",
+    "prebuild": "rm -rf dist",
+    "postbuild": "chmod +x dist/index.cjs"
   },
   "dependencies": {
+    "axios": "^1.10.0",
+    "commander": "^12.0.0",
     "ethers": "^6.14.4",
     "fs": "^0.0.1-security",
     "yaml": "^2.8.0"

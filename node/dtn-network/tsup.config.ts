@@ -2,10 +2,19 @@ import { defineConfig } from 'tsup';
 
 export default defineConfig({
   entry: ['src/index.ts'],
-  //format: ['esm', 'cjs'],
-  //dts: true,
-  //outExtension({ format }) {
-  //  return format === 'esm' ? { js: '.mjs' } : { js: '.cjs' };
-  //},
+  format: ['cjs'],
+  target: 'node18',
+  platform: 'node',
+  bundle: true,
+  minify: false,
+  sourcemap: false,
+  clean: true,
+  outDir: 'dist',
+  splitting: false,
+  treeshake: true,
+  external: [],
+  banner: {
+    js: '#!/usr/bin/env node'
+  }
 });
 

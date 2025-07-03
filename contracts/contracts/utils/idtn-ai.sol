@@ -30,7 +30,8 @@ interface IDtnAi is IDtnAiModels {
      * @notice Structure for AI request parameters
      */
     struct DtnRequest {
-        bytes call;     // Encoded call data
+        bytes call;     // Encoded call data according to the model API
+        bytes extraParams; // Extra parameters for the call, used as parameters for the call
         CallType calltype;  // Type of response expected
         uint256 feePerByteReq; // Fee per byte for request size
         uint256 feePerByteRes; // Fee per byte for response size
@@ -51,7 +52,7 @@ interface IDtnAi is IDtnAiModels {
     struct Response {
         ResponseStatus status;      // Response status code
         string message;      // Additional message or error details
-        string response;     // The actual response data
+        bytes response;     // The actual response data (abi encoded)
         bytes32 nodeId;      // ID of the node that provided the response
         uint256 timestamp;   // When the response was provided
     }
@@ -113,7 +114,7 @@ interface IDtnAi is IDtnAiModels {
     function fetchResponse(bytes32 requestId) external view returns (
         ResponseStatus status,
         string memory message,
-        string memory response
+        bytes memory response
     );
 
     /**
@@ -130,7 +131,7 @@ interface IDtnAi is IDtnAiModels {
         bytes32 requestId,
         ResponseStatus status,
         string memory message,
-        string memory response,
+        bytes memory response,
         bytes32 nodeId,
         uint256 requestSize,
         uint256 responseSize

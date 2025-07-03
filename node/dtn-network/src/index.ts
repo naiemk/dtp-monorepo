@@ -1,1 +1,2 @@
-console.log("Hello via Bun!");
+// Import and run the CLI
+import './cli';

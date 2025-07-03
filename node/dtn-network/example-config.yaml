@@ -1,0 +1,45 @@
+# Example configuration for DTN Network Node
+# Copy this file to config.yaml and update with your actual values
+
+keys:
+  ownerPrivateKey: "OWNER_PRIVATE_KEY_ENV_VAR_NAME"
+  workerPrivateKey: "WORKER_PRIVATE_KEY_ENV_VAR_NAME"
+
+network:
+  rpcUrl: "https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID"
+  chainId: 11155111
+  nodeManagerAddress: "0x..."
+  modelManagerAddress: "0x..."
+  routerAddress: "0x..."
+
+# IPFS Configuration using Pinata
+ipfs:
+  apiKey: "YOUR_PINATA_API_KEY"
+  secretKey: "YOUR_PINATA_SECRET_KEY"
+  gateway: "https://gateway.pinata.cloud" # Optional, defaults to Pinata gateway
+
+modelApis:
+  "openai":
+    specs: "https://platform.openai.com/docs/api-reference"
+    docs: "OpenAI API documentation"
+
+customModels:
+  - name: "gpt-4"
+    api: "openai"
+
+node:
+  username: "your-username"
+  nodeName: "your-node-name"
+  worker: "0x..." # Your worker address
+
+models:
+  - name: "gpt-4"
+    priceMinPerByteIn: 0.000001
+    priceMaxPerByteOut: 0.000002
+    host: "https://api.openai.com"
+
+trustNamespaces:
+  - "trust.system"
+  - "node.system"
+
+maxLookBackRequests: 10 

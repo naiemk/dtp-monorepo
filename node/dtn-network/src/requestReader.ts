@@ -1,4 +1,4 @@
-import type { NodeConfig, RouterRequest } from "./types";
+import { type NodeConfig, type RouterRequest } from "./types";
 import { ethers } from "ethers";
 
 // Router contract interface
@@ -43,12 +43,29 @@ export class RequestReader {
     }
 
     /**
+     * Get a specific request by ID
+     * @param requestId The ID of the request to fetch
+     * @returns The request details
+     */
+    async getRequest(requestId: string): Promise<RouterRequest> {
+        if (!this.routerContract) {
+            throw new Error("RequestReader not properly initialized");
+        }
+        return await this.routerContract.getRequest(requestId);
+    }
+
+    /**
      * Fetch all the pending requests from dtp router, and
      * filter them based on the node's configuration.
      * @param lastRequestIdx - The index of the first request to fetch
      * @param lastResponseIdx - The index of the first response to fetch
      */
-    async fetchRelevantRequests(lastRequestIdx: number, lastResponseIdx: number) {
+    async fetchRelevantRequests(lastRequestIdx: number, lastResponseIdx: number): Promise<{
+        requestIds: string[];
+        relevantRequests: RouterRequest[];
+        newLastRequestIdx: number;
+        newLastResponseIdx: number;
+    }> {
         if (!this.provider || !this.routerContract || !this.nodeId) {
             throw new Error("RequestReader not properly initialized");
         }
@@ -105,7 +122,8 @@ export class RequestReader {
 
         // 3. Filter and return the requests that are not yet responded and match 
         // the node's configuration
-        const relevantRequests: string[] = [];
+        const relevantRequests: RouterRequest[] = [];
+        const requestIds: string[] = [];
 
         for (const requestId of pendingRequests) {
             try {
@@ -118,7 +136,8 @@ export class RequestReader {
 
                 // Check if we can serve this request
                 if (await this.canServeRequest(request)) {
-                    relevantRequests.push(requestId);
+                    relevantRequests.push(request);
+                    requestIds.push(requestId);
                 }
             } catch (error) {
                 console.error(`Error processing request ${requestId}:`, error);
@@ -127,6 +146,7 @@ export class RequestReader {
         }
 
         return {
+            requestIds,
             relevantRequests,
             newLastRequestIdx: Number(pendingRequestsLength),
             newLastResponseIdx: Number(completedRequestsLength)

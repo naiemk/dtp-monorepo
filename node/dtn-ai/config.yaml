@@ -1,0 +1,13 @@
+# DTN AI Server Configuration
+# Maps model names to their processor modules
+
+models:
+  - model: "model.system.openai-gpt-o3-simpletext"
+    processor: "processor_gpt_o3"
+  
+  - model: "model.system.openai-gpt-o3-simpleimage"
+    processor: "processor_gpt_o3"
+  
+  # Add more models as needed
+  # - model: "model.system.another-model"
+  #   processor: "processor_another" 

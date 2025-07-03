@@ -34,7 +34,8 @@ contract CallAiExample is WithDtnAi {
             keccak256(abi.encodePacked("model.system.openai-gpt-4")), // the model ID
             DtnDefaults.defaultCustomNodesValidatedAny(nodes),
             IDtnAi.DtnRequest({
-                call: abi.encode("text", prompt, "", bytes("")),
+                call: abi.encode("text {0:uint8} and {1:address}", prompt),
+                extraParams: abi.encode(12, address(this)),
                 calltype: IDtnAi.CallType.DIRECT, 
                 feePerByteReq: 0.001 * 10**18,
                 feePerByteRes: 0.001 * 10**18,
@@ -51,9 +52,9 @@ contract CallAiExample is WithDtnAi {
     }
 
     function callback(bytes32 _requestId) external onlyDtn {
-        (IDtnAi.ResponseStatus status, string memory message, string memory response) = ai.fetchResponse(_requestId);
-        result = response;
-        emit Result(requestId, status, message, response);
+        (IDtnAi.ResponseStatus status, string memory message, bytes memory response) = ai.fetchResponse(_requestId);
+        result = abi.decode(response, (string));
+        emit Result(requestId, status, message, result);
     }
 
     function aiError(bytes32 _requestId) external onlyDtn {
