@@ -14,12 +14,19 @@ from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
+class ApiError(Exception):
+    """Custom exception for API errors"""
+    def __init__(self, message: str, error_code: Optional[str] = None):
+        self.message = message
+        self.error_code = error_code
+        super().__init__(self.message)
+
 # Initialize OpenAI client
 def _get_openai_client() -> OpenAI:
     """Get OpenAI client with API key from environment"""
     api_key = os.getenv('OPENAI_API_KEY')
     if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable is required")
+        raise ApiError("OPENAI_API_KEY environment variable is required", "MISSING_API_KEY")
     return OpenAI(api_key=api_key)
 
 def execute_call(model: str, parameters: List[Any], types: List[str]) -> Tuple[Any, str]:
@@ -61,10 +68,10 @@ def _handle_text_generation(parameters: List[Any], types: List[str]) -> Tuple[st
     - result_type: "string"
     """
     if len(parameters) < 1:
-        raise ValueError("Text generation requires at least 1 parameter (prompt)")
+        raise ApiError("Text generation requires at least 1 parameter (prompt)", "INVALID_PARAMETERS")
     
     if len(types) < 1 or types[0] != "string":
-        raise ValueError("First parameter must be a string (prompt)")
+        raise ApiError("First parameter must be a string (prompt)", "INVALID_PARAMETERS")
     
     prompt = parameters[0]
     
@@ -83,17 +90,14 @@ def _handle_text_generation(parameters: List[Any], types: List[str]) -> Tuple[st
         
         generated_text = response.choices[0].message.content
         if not generated_text:
-            raise ValueError("No response generated from OpenAI API")
+            raise ApiError("No response generated from OpenAI API", "NO_RESPONSE")
         
         logger.info(f"Generated text response: {generated_text[:100]}...")
         return generated_text, "string"
         
     except Exception as e:
         logger.error(f"OpenAI API error for text generation: {e}")
-        # Fallback to mock response if API fails
-        fallback_response = f"Mock GPT-O3 response to: {prompt}"
-        logger.warning(f"Using fallback response: {fallback_response[:100]}...")
-        return fallback_response, "string"
+        raise ApiError(f"Text generation failed: {str(e)}", "TEXT_GENERATION_ERROR")
 
 def _handle_image_generation(parameters: List[Any], types: List[str]) -> Tuple[str, str]:
     """
@@ -109,40 +113,40 @@ def _handle_image_generation(parameters: List[Any], types: List[str]) -> Tuple[s
     - result_type: "bytes"
     """
     if len(parameters) < 1:
-        raise ValueError("Image generation requires at least 1 parameter (prompt)")
+        raise ApiError("Image generation requires at least 1 parameter (prompt)", "INVALID_PARAMETERS")
     if len(types) < 1 or types[0] != "string":
-        raise ValueError("First parameter must be a string (prompt)")
+        raise ApiError("First parameter must be a string (prompt)", "INVALID_PARAMETERS")
+    
     prompt = parameters[0]
 
     try:
         client = _get_openai_client()
-        # GPT-4o image output via chat completions
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            response_format={"type": "image_url"},
-            max_tokens=1  # No text output, just image
+        size = "1024x1024"
+
+        # Use GPT-4o multimodal image generation
+        # The correct approach is to use the chat completions with a specific prompt format
+        # 1️⃣ Generate the image (no chat wrapper needed)
+        response = client.images.generate(
+            model="gpt-image-1",
+            prompt=prompt,
+            n=1,
+            size=size,                 # 1024×1024, 1024×1536, 1536×1024, or "auto"
+            # response_format="b64_json", # ask for raw base-64
+            # optional: quality="high" | "medium" | "low"
+            moderation="low"
         )
-        # Extract image URL from response
-        image_url = response.choices[0].message.content[0].get("image_url")
-        if not image_url:
-            raise ValueError("No image URL returned from GPT-4o API")
-        # Download the image and convert to base64
-        image_response = requests.get(image_url)
-        image_response.raise_for_status()
-        image_data = image_response.content
-        base64_data = base64.b64encode(image_data).decode('utf-8')
-        logger.info(f"Generated image for prompt: {prompt} using GPT-4o")
-        return base64_data, "bytes"
+        
+        # 2️⃣ Extract the Base-64 payload
+        image_b64: str | None = response.data[0].b64_json if response.data else None
+        if not image_b64:
+            raise ApiError("No image data in gpt-image-1 response", "NO_IMAGE_DATA")
+
+        logger.info("Generated image for prompt %r using gpt-image-1", prompt)
+        return image_b64, "bytes"
+        
     except Exception as e:
-        logger.error(f"OpenAI API error for GPT-4o image generation: {e}")
-        # Fallback to mock response if API fails
-        mock_image_data = b"mock_image_data"
-        mock_base64 = base64.b64encode(mock_image_data).decode('utf-8')
-        logger.warning(f"Using fallback image response for prompt: {prompt}")
-        return mock_base64, "bytes"
+        logger.error("OpenAI API error during image generation: %s", e)
+        raise ApiError(f"Image generation failed: {e}", "IMAGE_GENERATION_ERROR")
 
 def _validate_parameters(parameters: List[Any], types: List[str], expected_types: List[str]) -> None:
     """

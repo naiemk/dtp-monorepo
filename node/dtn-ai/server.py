@@ -13,6 +13,17 @@ from typing import Dict, Any, Tuple, Optional
 from aiohttp import web, ClientSession
 import yaml
 
+# Import the ApiError from processor module
+try:
+    from processor_gpt_o3 import ApiError as ProcessorApiError
+except ImportError:
+    # Fallback if processor module is not available
+    class ProcessorApiError(Exception):
+        def __init__(self, message: str, error_code: Optional[str] = None):
+            self.message = message
+            self.error_code = error_code
+            super().__init__(self.message)
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -116,6 +127,15 @@ class DTNAIServer:
                     'datatype': result_type,
                     'error': ''
                 })
+                
+            except ProcessorApiError as e:
+                logger.error(f"API error processing request {request_id}: {e.message}")
+                return web.json_response({
+                    'requestId': request_id,
+                    'data': '',
+                    'datatype': '',
+                    'error': e.message
+                }, status=400)
                 
             except Exception as e:
                 logger.error(f"Error processing request {request_id}: {e}")

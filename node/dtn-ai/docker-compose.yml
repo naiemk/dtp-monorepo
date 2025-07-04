@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  dtn-ai-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8026:8026"
+    environment:
+      - PORT=8026
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8026/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+        reservations:
+          memory: 256M
+          cpus: '0.5' 
