@@ -52,7 +52,6 @@ async function deployRouter() {
   // Initialize Router with all dependencies
   await router.initialize(
     ethers.parseEther("1"), // minAuthoredStake
-    ethers.parseEther("1"), // minNodeStake
     owner.address
   );
   
@@ -63,7 +62,7 @@ async function deployRouter() {
   await namespaceManager.addDtnContracts([router.target, sessionManager.target, nodeManager.target]);
 
   // Register a model
-  await router.registerModel('model.system', 'openai-gpt-4');
+  await router.registerModel('model.system', 'openai-gpt-4', 'api.system.openai-gpt-4');
 
   // Deploy CallAiExample
   const callAiF = await ethers.getContractFactory("CallAiExample");

@@ -3,8 +3,9 @@ pragma solidity ^0.8.0;
 
 import "./multiowner-base.sol";
 import "./inamespace-manager.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract NamespaceManager is Initializable, MultiOwnerBase, INamespaceManager {
+contract NamespaceManager is Initializable, UUPSUpgradeable, MultiOwnerBase, INamespaceManager {
     /// @custom:storage-location erc7201:dtn.core.namespacemanager.001
     struct NamespaceManagerStorageV001 {
         mapping(bytes32 => NamespaceConfig) namespaces;
@@ -77,4 +78,7 @@ contract NamespaceManager is Initializable, MultiOwnerBase, INamespaceManager {
 
     /// @dev Event emitted when a new namespace is registered
     event NamespaceRegistered(string indexed namespace, bytes32 indexed namespaceId, address indexed owner);
+
+    function _authorizeUpgrade(address newImplementation) internal onlyOwner virtual override {
+    }
 }
