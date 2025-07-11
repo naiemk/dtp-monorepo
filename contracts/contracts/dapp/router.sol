@@ -7,7 +7,8 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../model/model-manager.sol";
+import "hardhat/console.sol";
+import "../model/imodel-manager.sol";
 import "../core/trust.sol";
 import "../utils/idtn-ai.sol";
 import "../core/multiowner-base.sol";
@@ -25,7 +26,6 @@ contract RouterUpgradeable is
     UUPSUpgradeable,
     AccessControlUpgradeable,
     MultiOwnerBase,
-    ModelManagerUpgradeable,
     TrustManagerUpgradeable,
     ReentrancyGuardUpgradeable,
     IDtnAi,
@@ -37,6 +37,7 @@ contract RouterUpgradeable is
         // Request management
         address nodeManager;
         address sessionManager;
+        address modelManager;
         bytes32[] requestIds;
         bytes32[] completedRequestIds;
         mapping(bytes32 => Request) requests;
@@ -81,14 +82,13 @@ contract RouterUpgradeable is
     ) public initializer {
         __AccessControl_init();
         __MultiOwnerBase_init(owner);
-        __ModelManager_init(); // Initialize with null address for namespace manager
         __TrustManager_init(minAuthoredStake);
         __Router_init_unchained();
         __ReentrancyGuard_init();
 
         // Setup initial roles
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(Dtn.OWNER_ROLE, msg.sender);
+        _grantRole(DEFAULT_ADMIN_ROLE, owner);
+        _grantRole(Dtn.OWNER_ROLE, owner);
         _setRoleAdmin(Dtn.SYSTEM_ADMIN_ROLE, Dtn.OWNER_ROLE);
         _setRoleAdmin(Dtn.TRUST_ADMIN_ROLE, Dtn.SYSTEM_ADMIN_ROLE);
         _setRoleAdmin(Dtn.GENERAL_ADMIN_ROLE, Dtn.SYSTEM_ADMIN_ROLE);
@@ -116,6 +116,15 @@ contract RouterUpgradeable is
     function feeTarget() public override view returns (address) {
         RouterStorageV001 storage $ = getRouterStorageV001();
         return ISessionManager($.sessionManager).getFeeTarget();
+    }
+
+    /**
+     * @notice Calculate the model ID from the full model name (namespace.modelName)
+     * @param modelFullName The full model name in format namespace.modelName
+     * @return The calculated model ID
+     */
+    function modelId(string memory modelFullName) external pure override returns (bytes32) {
+        return keccak256(abi.encodePacked(modelFullName));
     }
 
     function getPendingRequestsLength() public view returns (uint256) {
@@ -151,13 +160,11 @@ contract RouterUpgradeable is
         return $.requests[requestId];
     }
 
-    function setDependencies(address nodeManager, address sessionManager, address namespaceManager) external onlyOwner {
+    function setDependencies(address nodeManager, address sessionManager, address modelManager, address namespaceManager) external onlyOwner {
         RouterStorageV001 storage $ = getRouterStorageV001();
         $.nodeManager = nodeManager;
         $.sessionManager = sessionManager;
-
-        //model manager
-        _setDependencies(namespaceManager);
+        $.modelManager = modelManager;
     }
 
     /**
@@ -194,7 +201,7 @@ contract RouterUpgradeable is
         ISessionManager.Session memory session = ISessionManager($.sessionManager).getSessionById(sessionId);
         require(session.owner == msg.sender, "Session not related to the user");
         require(msg.value >= callbackGas, "Insufficient callback gas");
-        require(IModelManager(address(this)).modelExists(_modelId), "Model does not exist");
+        require(IModelManager($.modelManager).modelExists(_modelId), "Model does not exist");
 
         bytes32 requestId = keccak256(
             abi.encodePacked(block.timestamp, sessionId, user, msg.sender)

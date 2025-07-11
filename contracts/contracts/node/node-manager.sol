@@ -60,6 +60,9 @@ contract NodeManagerUpgradeable is
         __AccessControl_init();
         __ReentrancyGuard_init();
         __NodeManager_init_unchained(namespaceManager, minStakeAmount_);
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(Dtn.OWNER_ROLE, msg.sender);
     }
 
     function __NodeManager_init_unchained(address namespaceManager, uint256 minStakeAmount_) internal onlyInitializing {

@@ -56,7 +56,8 @@ async function deployRouter() {
   );
   
   // Set up dependencies
-  await router.setDependencies(nodeManager.target, sessionManager.target, namespaceManager.target);
+  await router.setDependencies(nodeManager.target, sessionManager.target, modelManager.target, namespaceManager.target);
+  await modelManager.setRouter(router.target);
   await router.grantRole(await router.NAMESPACE_ADMIN_ROLE(), owner.address);
   await sessionManager.addDtnContracts([router.target]);
   await namespaceManager.addDtnContracts([router.target, sessionManager.target, nodeManager.target]);

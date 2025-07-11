@@ -61,6 +61,11 @@ contract SessionManagerUpgradeable is Initializable, MultiOwnerBase, ISessionMan
         }
     }
 
+    function setFeeTarget(address _feeTarget) external onlyOwner {
+        SessionManagerStorageV001 storage $ = _getStorage();
+        $.feeTarget = _feeTarget;
+    }
+
     function sync(address token) internal returns (uint) {
         SessionManagerStorageV001 storage $ = _getStorage();
         uint currentBalance = IERC20(token).balanceOf(address(this));

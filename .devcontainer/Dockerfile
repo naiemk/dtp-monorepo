@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     unzip \
     && rm -rf /var/lib/apt/lists/*
+USER node
 
 # Create and activate a Python virtual environment
 RUN python3 -m venv /opt/venv
@@ -29,3 +30,5 @@ RUN echo 'alias c="clear"' >> /home/node/.bashrc
 
 # Set working directory
 WORKDIR /workspace
+
+# Switch to node user

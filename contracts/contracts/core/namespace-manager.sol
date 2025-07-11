@@ -25,6 +25,7 @@ contract NamespaceManager is Initializable, UUPSUpgradeable, MultiOwnerBase, INa
 
     function __NamespaceManager_init(address _owner) internal onlyInitializing {
         __MultiOwnerBase_init(_owner);
+
         _registerNamespace("model.system", address(0));
         _registerNamespace("node.system", address(0));
         _registerNamespace("trust.system", address(0));

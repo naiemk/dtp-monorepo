@@ -19,6 +19,8 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDt
     struct ModelManagerStorageV001 {
         // The namespace manager contract address
         address namespaceManager;
+        // The router contract address
+        address router;
         // API ID => Model API
         mapping(bytes32 => ModelApi) apisById;
         // Model ID => Model Config
@@ -28,14 +30,18 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDt
     // keccak256(abi.encode(uint256(keccak256("dtn.storage.modelmanager.001")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant ModelStorageV001Location = 0x317ad3d122488b64c2d86bf285bd2d0e9a7289d8b50201f32d6abb04fde8a300;
 
-    function __ModelManager_init() internal onlyInitializing {
-        __AccessControl_init();
-        __ModelManager_init_unchained();
+    function initialize(address owner) public initializer {
+        __ModelManager_init(owner);
     }
 
-    function __ModelManager_init_unchained() internal onlyInitializing {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(NAMESPACE_ADMIN_ROLE, msg.sender);
+    function __ModelManager_init(address owner) internal onlyInitializing {
+        __AccessControl_init();
+        __ModelManager_init_unchained(owner);
+    }
+
+    function __ModelManager_init_unchained(address owner) internal onlyInitializing {
+        _grantRole(DEFAULT_ADMIN_ROLE, owner);
+        _grantRole(NAMESPACE_ADMIN_ROLE, owner);
     }
 
     function getModelStorageV001() internal pure returns (ModelManagerStorageV001 storage $) {
@@ -47,6 +53,15 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDt
     function _setDependencies(address _namespaceManager) internal virtual {
         ModelManagerStorageV001 storage $ = getModelStorageV001();
         $.namespaceManager = _namespaceManager;
+    }
+
+    /**
+     * @notice Set the router address (only callable by admin)
+     * @param _router The router contract address
+     */
+    function setRouter(address _router) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        ModelManagerStorageV001 storage $ = getModelStorageV001();
+        $.router = _router;
     }
 
 
