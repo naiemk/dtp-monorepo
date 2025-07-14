@@ -31,13 +31,12 @@ The setup automatically generates Docker Compose configurations from a single `f
 
 4. **Start the services:**
    ```bash
-   docker-compose up -d
+   ./start_docker.sh start
    ```
 
 5. **Check the status:**
    ```bash
-   docker-compose ps
-   docker-compose logs -f
+   ./start_docker.sh status
    ```
 
 ## Configuration
