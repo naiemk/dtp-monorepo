@@ -42,9 +42,12 @@ def generate_sidecar_services(sidecars_config):
             with open(f"docker-compose/{sidecar_name}-config.yaml", 'w') as f:
                 yaml.dump({"models": sidecar_config['models']}, f, default_flow_style=False, indent=2)
             
+            # Get the docker image from the new docker-image field
+            docker_image = sidecar_config.get("docker-image", "latest")
+            
             # Create the service configuration
             service_config = yaml.safe_load(f"""{service_name}:
-    image: {sidecar_config["image"]}
+    image: {docker_image}
     container_name: {service_name}
     ports:
       - "802{i+6}:8026"  # Dynamic port assignment
@@ -63,7 +66,7 @@ def generate_sidecar_services(sidecars_config):
       retries: 3
       start_period: 40s
     depends_on:
-      - dtn-network""")
+      - dtn-node""")
             
             services[service_name] = service_config[service_name]
     
@@ -75,6 +78,10 @@ def generate_docker_compose(base_content, out_compose, config, services):
     # Read the base docker-compose template
     with open(base_content, 'r') as f:
         template = yaml.safe_load(f)
+
+    # Update the main dtn-network service with the docker-image from config
+    if 'dtn-node' in template['services'] and 'dtn-network' in config:
+        template['services']['dtn-node']['image'] = config['dtn-network'].get('docker-image', 'dtn-network-node:latest')
 
     for sk, sv in services.items():
         template['services'][sk] = sv

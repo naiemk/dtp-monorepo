@@ -2,6 +2,8 @@
 # Copy this file to config.yaml and update with your actual values
 
 dtn-network:
+  docker-image: "dtn-network-node:latest"
+
   keys:
     ownerPrivateKey: "OWNER_PRIVATE_KEY_ENV_VAR_NAME"
     workerPrivateKey: "WORKER_PRIVATE_KEY_ENV_VAR_NAME"
@@ -56,5 +58,5 @@ dtn-ai-sidecars:
         
         - model: "model.system.openai-gpt-o3-simpleimage"
           processor: "processor_gpt_o3"
-      image:
-        "my-ai-sidecar"
+      docker-image:
+        "dtn-openai-proxy:latest"

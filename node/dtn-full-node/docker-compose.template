@@ -1,10 +1,7 @@
-version: '3.8'
 
 services:
   dtn-node:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
+    image: IMAGE
     container_name: dtn-network
     environment:
       - NODE_ENV=production
@@ -16,9 +13,15 @@ services:
       # Mount cache directory for persistence
       - dtn-cache:/app/cache
     restart: unless-stopped
+    networks:
+      - dtn-network
     # Uncomment if you need to expose ports
     # ports:
     #   - "3000:3000"
 
 volumes:
-  dtn-cache: 
+  dtn-cache:
+
+networks:
+  dtn-network:
+    driver: bridge 
