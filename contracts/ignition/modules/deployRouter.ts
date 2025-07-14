@@ -37,6 +37,7 @@ const LockModule = buildModule("DeployRouter", (m) => {
   let sessionManagerInitCalldata = m.encodeFunctionCall(sessionManagerImpl, "initialize", [token, ZeroAddress, owner]);
   const sessionManagerProxy = m.contract("ERC1967Proxy", [sessionManagerImpl, sessionManagerInitCalldata], { id: "sessionManagerProxy" });
   const sessionManager = m.contractAt("SessionManagerUpgradeable", sessionManagerProxy, { id: "sessionManager" });
+  m.call(sessionManager, "setFeeTarget", [sessionManager], { id: "sessionManagerSetFeeTarget" });
   
   // Deploy RouterUpgradeable implementation and proxy
   const routerImpl = m.contract("RouterUpgradeable", [], { id: "routerImpl" });

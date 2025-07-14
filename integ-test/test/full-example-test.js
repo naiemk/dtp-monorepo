@@ -3,10 +3,12 @@ const { ethers } = require("hardhat");
 const { execSync, spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
+const DtnNodeManager = require("./dtn-node-manager");
 
 describe("DTN Full Example Test", function () {
   let owner, user1, user2;
   let deployedAddresses = {};
+  let dtnNodeManager = null;
 
   // Test configuration
   const TEST_CONFIG = {
@@ -126,18 +128,28 @@ describe("DTN Full Example Test", function () {
     it("Should launch DTN full node with dtn-network and dtn-ai", async function () {
       console.log("\n📋 Step 4: Launch a DTN full node");
       
-      // This step would typically involve:
-      // 1. Setting up environment variables
-      // 2. Running docker-compose or individual services
-      // 3. Waiting for services to be ready
+      // Path to the full node setup
+      const fullNodeDir = path.join(__dirname, "../../node/dtn-full-node");
       
-      console.log("⚠️  Node deployment would require:");
-      console.log("   - Setting up .env file with private keys and API keys");
-      console.log("   - Running docker-compose up -d");
-      console.log("   - Waiting for services to be ready");
+      // Check if the full node directory exists
+      if (!fs.existsSync(fullNodeDir)) {
+        console.log("❌ Full node directory not found:", fullNodeDir);
+        throw new Error("DTN full node setup not found");
+      }
       
-      // For testing purposes, we'll simulate the node response
-      console.log("✅ Simulating node deployment for test purposes");
+      console.log("✅ Found full node directory:", fullNodeDir);
+      
+      try {
+        // Initialize the DTN Node Manager
+        dtnNodeManager = new DtnNodeManager(fullNodeDir, TEST_CONFIG);
+        
+        // Launch the complete DTN full node
+        await dtnNodeManager.launchNode(deployedAddresses, owner, user1);
+        
+      } catch (error) {
+        console.error("❌ Failed to launch DTN full node:", error.message);
+        throw error;
+      }
     });
   });
 
@@ -380,6 +392,15 @@ describe("DTN Full Example Test", function () {
       console.log("✅ External Hardhat node stopped successfully");
     } catch (error) {
       console.error("⚠️  Error stopping external Hardhat node:", error.message);
+    }
+    
+    // Clean up the DTN full node services if they were started
+    if (dtnNodeManager) {
+      try {
+        await dtnNodeManager.cleanup();
+      } catch (cleanupError) {
+        console.log("⚠️  Error stopping DTN services:", cleanupError.message);
+      }
     }
     
     console.log("✅ Cleanup completed");

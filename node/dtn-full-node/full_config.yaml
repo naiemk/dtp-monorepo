@@ -47,7 +47,7 @@ dtn-network:
 
 # extra config for each sidecars that runs `dtn-ai` models
 dtn-ai-sidecars:
-  - openai-proxy:
+  - dtn-openai-proxy:
       envs:
         OPENAI_API_KEY: "YOUR_OPENAI_API_KEY_ENV_VAR_NAME"
       models:

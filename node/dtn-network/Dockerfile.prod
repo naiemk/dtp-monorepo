@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-alpine AS builder
+FROM oven/bun:1-alpine AS builder
 
 # Install necessary packages for building
 RUN apk add --no-cache \
@@ -13,19 +13,23 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
+COPY bun.lock ./
 COPY tsup.config.ts ./
 
 # Install all dependencies (including dev dependencies for building)
-RUN npm ci
+RUN bun install
 
 # Copy source code
 COPY src/ ./src/
 
 # Build the application
-RUN npm run build
+RUN bun run build
+
+# Copy configuration file
+COPY src/nodeConfig.yaml ./nodeConfig.yaml
 
 # Production stage
-FROM node:18-alpine AS production
+FROM oven/bun:1-alpine AS production
 
 # Install runtime dependencies only
 RUN apk add --no-cache dumb-init
@@ -51,4 +55,4 @@ ENV NODE_ENV=production
 ENTRYPOINT ["dumb-init", "--"]
 
 # Default command
-CMD ["node", "dist/index.js", "--help"] 
+CMD ["bun", "dist/index.cjs", "--help"] 

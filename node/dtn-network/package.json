@@ -25,7 +25,11 @@
     "start:loop": "node dist/index.cjs loop",
     "configure": "node dist/index.cjs configure-node",
     "prebuild": "rm -rf dist",
-    "postbuild": "chmod +x dist/index.cjs"
+    "postbuild": "chmod +x dist/index.cjs",
+    "docker:build": "./scripts/build.sh",
+    "docker:test": "./scripts/test.sh",
+    "docker:all": "bun run docker:build && bun run docker:test",
+    "docker:clean": "docker rm -f dtn-node-test 2>/dev/null || true && docker rmi dtn-network-node:latest 2>/dev/null || true && rm -f test-config.yaml 2>/dev/null || true"
   },
   "dependencies": {
     "axios": "^1.10.0",

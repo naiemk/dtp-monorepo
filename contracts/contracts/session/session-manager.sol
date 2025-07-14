@@ -44,7 +44,7 @@ contract SessionManagerUpgradeable is Initializable, MultiOwnerBase, ISessionMan
     }
 
     function initialize(address _feeToken, address _feeTarget, address owner) public virtual initializer {
-        require(_feeTarget == address(this), "Use session manager as fee target");
+        // require(_feeTarget == address(this), "Use session manager as fee target");
         __SessionManager_init(_feeToken, _feeTarget);
         __MultiOwnerBase_init(owner);
     }

@@ -11,11 +11,12 @@ RUN apt-get update && apt-get install -y \
     curl \
     unzip \
     && rm -rf /var/lib/apt/lists/*
-USER node
 
 # Create and activate a Python virtual environment
 RUN python3 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+
+USER node
 
 # Install Node package managers
 RUN npm install -g yarn \

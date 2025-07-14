@@ -11,7 +11,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-IMAGE_NAME="dtn-ai-server"
+IMAGE_NAME="dtn-openai-proxy"
 TAG="latest"
 CONTAINER_NAME="dtn-ai-test"
 TEST_PORT="8026"
@@ -73,6 +73,10 @@ fi
 
 echo -e "${GREEN}✅ Container is running${NC}"
 
+# Show initial logs
+echo -e "${BLUE}📋 Initial container logs:${NC}"
+docker logs $CONTAINER_NAME
+
 # Wait for server to be ready
 echo -e "${BLUE}⏳ Waiting for server to be ready...${NC}"
 for i in {1..30}; do
@@ -82,6 +86,7 @@ for i in {1..30}; do
     fi
     if [ $i -eq 30 ]; then
         echo -e "${RED}❌ Server failed to start within 30 seconds${NC}"
+        echo -e "${BLUE}📋 Container logs (showing why server failed):${NC}"
         docker logs $CONTAINER_NAME
         exit 1
     fi
@@ -93,7 +98,7 @@ echo -e "${BLUE}🏥 Testing health endpoint...${NC}"
 HEALTH_RESPONSE=$(curl -s http://localhost:$TEST_PORT/health)
 echo "Health response: $HEALTH_RESPONSE"
 
-if echo "$HEALTH_RESPONSE" | grep -q '"status":"healthy"'; then
+if echo "$HEALTH_RESPONSE" | grep -q '"status": "healthy"'; then
     echo -e "${GREEN}✅ Health check passed${NC}"
 else
     echo -e "${RED}❌ Health check failed${NC}"
@@ -125,8 +130,12 @@ else
 fi
 
 # Test container logs
-echo -e "${BLUE}📋 Container logs:${NC}"
-docker logs $CONTAINER_NAME --tail 10
+echo -e "${BLUE}📋 Container logs (last 20 lines):${NC}"
+docker logs $CONTAINER_NAME --tail 20
+
+# Show real-time logs for a few seconds
+echo -e "${BLUE}📋 Showing real-time logs (5 seconds):${NC}"
+timeout 5 docker logs -f $CONTAINER_NAME || true
 
 # Test resource usage
 echo -e "${BLUE}📊 Container resource usage:${NC}"

@@ -112,3 +112,29 @@ To run in development mode with watch:
 ```bash
 bun run dev
 ```
+
+## Docker Operations
+
+### Build and Test Docker Image
+
+Build the Docker image:
+```bash
+bun run docker:build
+```
+
+Test the Docker container:
+```bash
+bun run docker:test
+```
+
+Build and test in one command:
+```bash
+bun run docker:all
+```
+
+Clean up Docker resources:
+```bash
+bun run docker:clean
+```
+
+For more details, see [scripts/README.md](scripts/README.md).
