@@ -1,6 +1,7 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "@typechain/hardhat";
+import "dotenv/config";
 
 // Import scripts to register tasks
 import "./scripts/deploy";
@@ -34,6 +35,10 @@ const config: HardhatUserConfig = {
         mnemonic: "test test test test test test test test test test test junk",
         count: 10,
       },
+    },
+    sepolia: {
+      url: "https://eth-sepolia.g.alchemy.com/public",
+      accounts: [process.env.PRIVATE_KEY || ''],
     },
   },
   ignition: {

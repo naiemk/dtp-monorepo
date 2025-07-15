@@ -26,6 +26,7 @@
     "configure": "node dist/index.cjs configure-node",
     "prebuild": "rm -rf dist",
     "postbuild": "chmod +x dist/index.cjs",
+    "test": "bun test",
     "docker:build": "./scripts/build.sh",
     "docker:test": "./scripts/test.sh",
     "docker:all": "bun run docker:build && bun run docker:test",

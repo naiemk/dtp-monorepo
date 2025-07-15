@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import { Contract, keccak256, Signer } from "ethers";
-import { RouterUpgradeable } from "../../typechain-types";
+import { ModelManagerUpgradeable, RouterUpgradeable } from "../../typechain-types";
 import { MockERC20 } from "../../typechain-types";
 import { CallAiExample } from "../../typechain-types";
 import { NodeManagerUpgradeable } from "../../typechain-types";
@@ -40,6 +40,11 @@ async function deployRouter() {
   const nodeManager = await nodeManagerF.deploy() as NodeManagerUpgradeable;
   await nodeManager.initialize(namespaceManager.target, '1');
 
+  // Deploy ModelManager
+  const modelManagerF = await ethers.getContractFactory("ModelManagerUpgradeable");
+  const modelManager = await modelManagerF.deploy() as ModelManagerUpgradeable;
+  await modelManager.initialize(owner.address);
+
   // Deploy SessionManager
   const sessionManagerF = await ethers.getContractFactory("SessionManagerUpgradeable");
   const sessionManager = await sessionManagerF.deploy() as SessionManagerUpgradeable;
@@ -58,12 +63,11 @@ async function deployRouter() {
   // Set up dependencies
   await router.setDependencies(nodeManager.target, sessionManager.target, modelManager.target, namespaceManager.target);
   await modelManager.setRouter(router.target);
-  await router.grantRole(await router.NAMESPACE_ADMIN_ROLE(), owner.address);
   await sessionManager.addDtnContracts([router.target]);
   await namespaceManager.addDtnContracts([router.target, sessionManager.target, nodeManager.target]);
 
   // Register a model
-  await router.registerModel('model.system', 'openai-gpt-4', 'api.system.openai-gpt-4');
+  await modelManager.registerModel('model.system', 'openai-gpt-4', 'api.system.openai-gpt-4');
 
   // Deploy CallAiExample
   const callAiF = await ethers.getContractFactory("CallAiExample");

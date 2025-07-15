@@ -61,7 +61,7 @@ export class ResponseGenerator {
             console.log(`Processing request ${requestId} for model ${request.modelId}`);
             
             // Send request to AI client
-            const aiResponse = await aiClient.request(requestId,
+            const aiResponse = await aiClient.request(
                 await this.requestParser.parseRouterRequest(requestId, request));
             
             if (aiResponse.error) {

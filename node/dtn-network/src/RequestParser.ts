@@ -66,7 +66,7 @@ export class RequestParser {
         // Create the formatted call object
         const formattedCall = {
             parameters: processedParams,
-            types: modelParams,
+            types: apiParameterTypes,
         };
         
         return {
