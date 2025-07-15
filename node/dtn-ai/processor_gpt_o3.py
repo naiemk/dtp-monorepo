@@ -61,7 +61,7 @@ def _handle_text_generation(parameters: List[Any], types: List[str]) -> Tuple[st
     Handle text generation requests
     
     Expected parameters:
-    - parameters[0]: prompt (string)
+    - parameters[0]: prompt (string), or (string[])
     
     Returns:
     - result: generated text (string)
@@ -73,7 +73,7 @@ def _handle_text_generation(parameters: List[Any], types: List[str]) -> Tuple[st
     if len(types) < 1 or types[0] != "string":
         raise ApiError("First parameter must be a string (prompt)", "INVALID_PARAMETERS")
     
-    prompt = parameters[0]
+    prompt = parameters.join("\n") if types[0] == "string[]" else parameters[0]
     
     try:
         client = _get_openai_client()
@@ -104,7 +104,7 @@ def _handle_image_generation(parameters: List[Any], types: List[str]) -> Tuple[s
     Handle image generation requests using GPT-4o multimodal capabilities
     
     Expected parameters:
-    - parameters[0]: prompt (string)
+    - parameters[0]: prompt (string), or (string[])
     - parameters[1]: width (uint64) [optional, not used by GPT-4o]
     - parameters[2]: height (uint64) [optional, not used by GPT-4o]
     
@@ -117,7 +117,7 @@ def _handle_image_generation(parameters: List[Any], types: List[str]) -> Tuple[s
     if len(types) < 1 or types[0] != "string":
         raise ApiError("First parameter must be a string (prompt)", "INVALID_PARAMETERS")
     
-    prompt = parameters[0]
+    prompt = parameters.join("\n") if types[0] == "string[]" else parameters[0]
 
     try:
         client = _get_openai_client()
