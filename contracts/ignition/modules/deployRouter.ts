@@ -47,7 +47,7 @@ const LockModule = buildModule("DeployRouter", (m) => {
 
   // Set dependencies for all contracts (after initialization)
   m.call(router, "setDependencies", [nodeManager, sessionManager, modelManager, namespaceManager], { id: "routerSetDeps" });
-  m.call(modelManager, "setRouter", [router], { id: "modelManagerSetRouter" });
+  m.call(modelManager, "setDependencies", [router, namespaceManager], { id: "modelManagerSetRouter" });
 
   // sessionManager.addDtnContracts([router.target]);
   m.call(sessionManager, "addDtnContracts", [[router]], { id: "sessionManagerAddDtnContracts" });

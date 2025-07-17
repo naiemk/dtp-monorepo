@@ -61,7 +61,7 @@ interface IDtnAi is IDtnAiModels {
      * @notice Callback structure for handling AI responses
      */
     struct CallBack {
-        bytes4 suscess;     // Function selector for successful response
+        bytes4 success;     // Function selector for successful response
         bytes4 failure;     // Function selector for failed response
         address target;     // Contract to call back
     }

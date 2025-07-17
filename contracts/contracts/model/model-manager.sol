@@ -50,20 +50,21 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDt
         }
     }
 
-    function _setDependencies(address _namespaceManager) internal virtual {
+    function getNamespaceManager() external view returns (address) {
+        ModelManagerStorageV001 storage $ = getModelStorageV001();
+        return $.namespaceManager;
+    }
+
+    function getRouter() external view returns (address) {
+        ModelManagerStorageV001 storage $ = getModelStorageV001();
+        return $.router;
+    }
+
+    function setDependencies(address _router, address _namespaceManager) external onlyRole(DEFAULT_ADMIN_ROLE) virtual {
         ModelManagerStorageV001 storage $ = getModelStorageV001();
         $.namespaceManager = _namespaceManager;
-    }
-
-    /**
-     * @notice Set the router address (only callable by admin)
-     * @param _router The router contract address
-     */
-    function setRouter(address _router) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        ModelManagerStorageV001 storage $ = getModelStorageV001();
         $.router = _router;
     }
-
 
     /**
      * @notice Register a model API for a namespace

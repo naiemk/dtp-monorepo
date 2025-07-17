@@ -15,11 +15,15 @@ network:
   modelManagerAddress: 0x1234567890123456789012345678901234567890
 
 model-apis:
-  - "api.node.alice.my-custom-api":
-    specs: "prompt: string,respnse-type: uint8,dimension-x: uint64,dimension-y: uint64"
+  - "api.node.alice.my-custom-api-text":
+    specs: "string[] -> string"
     docs: |
-      prompt: provide prompt
-      response-type: 0 for text, 1 for image
+      prompt: provide prompt (multiple string will be joined)
+  - "api.node.alice.my-custom-api-image":
+    specs: "string[], uint8, uint64, uint64 -> bytes"
+    docs: |
+      prompt: provide prompt (multiple string will be joined)
+      response-type: 0 for old model, 1 for new model
       dimension-x: width of the image
       dimension-y: height of the image
 

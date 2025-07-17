@@ -5,6 +5,7 @@ import "../../utils/with-dtn-ai.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../../utils/dtn-defaults.sol";
+import "hardhat/console.sol";
 
 contract CallAiExample is WithDtnAi {
     using SafeERC20 for IERC20;
@@ -56,7 +57,7 @@ contract CallAiExample is WithDtnAi {
     function callback(bytes32 _requestId) external onlyDtn {
         (IDtnAi.ResponseStatus status, string memory message, bytes memory response) = ai.fetchResponse(_requestId);
         result = abi.decode(response, (string));
-        emit Result(requestId, status, message, result);
+        emit Result(_requestId, status, message, result);
     }
 
     function aiError(bytes32 _requestId) external onlyDtn {

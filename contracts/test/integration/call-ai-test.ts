@@ -19,6 +19,7 @@ interface TestContext {
   callAi: CallAiExample;
   nodeManager: NodeManagerUpgradeable;
   namespaceManager: NamespaceManager;
+  modelManager: ModelManagerUpgradeable;
 }
 
 async function deployRouter() {
@@ -62,7 +63,7 @@ async function deployRouter() {
   
   // Set up dependencies
   await router.setDependencies(nodeManager.target, sessionManager.target, modelManager.target, namespaceManager.target);
-  await modelManager.setRouter(router.target);
+  await modelManager.setDependencies(router.target, namespaceManager.target);
   await sessionManager.addDtnContracts([router.target]);
   await namespaceManager.addDtnContracts([router.target, sessionManager.target, nodeManager.target]);
 
@@ -73,7 +74,7 @@ async function deployRouter() {
   const callAiF = await ethers.getContractFactory("CallAiExample");
   const callAi = await callAiF.deploy(router.target) as CallAiExample;
   
-  return { owner, acc1, router, token, callAi, nodeManager, namespaceManager } as TestContext;
+  return { owner, acc1, router, token, callAi, nodeManager, namespaceManager, modelManager } as TestContext;
 }
 
 describe("Run and end-to-end call ai and print result", function () {
@@ -83,8 +84,13 @@ describe("Run and end-to-end call ai and print result", function () {
       console.log(`Owner: ${ctx.owner.address}, Router: ${ctx.router.target} token: ${ctx.token.target}`);
       await ctx.token.approve(ctx.callAi.target, ethers.parseEther("100"));
 
-      await ctx.callAi.doCallAi("What is A+B, if A=10 and B=12. Write only one single number as response.", {
-        value: ethers.parseEther("0.0001") });
+      console.log("NS MGR", await ctx.modelManager.getNamespaceManager());
+      console.log("NS MGR", await ctx.modelManager.getRouter());
+
+      await ctx.callAi.doCallAi("What is A+B, if A=10 and B=12. Write only one single number as response.",
+        "node.tester.node1",
+        "model.system.openai-gpt-4",
+        { value: ethers.parseEther("0.0001") });
 
       console.log(`Now check if there is a request, ready for the node to pick up`)
       const reqId = await ctx.callAi.requestId();
@@ -101,18 +107,18 @@ describe("Run and end-to-end call ai and print result", function () {
       await ctx.nodeManager.setNodeModels(nodeId, [ethers.solidityPackedKeccak256(['string'], ['model.system.openai-gpt-4'])]);
 
       await ctx.token.approve(ctx.callAi.target, ethers.parseEther("100"));
-      await ctx.callAi.doCallAi("What is A+B, if A=10 and B=12. Write only one single number as response.", {
-        value: ethers.parseEther("0.0001") });
-
-      await ctx.callAi.doCallAi("What is A+B, if A=10 and B=12. Write only one single number as response.", {
-        value: ethers.parseEther("0.0001") });
+      await ctx.callAi.doCallAi("What is A+B, if A=10 and B=12. Write only one single number as response.",
+        "node.tester.node1",
+        "model.system.openai-gpt-4",
+        { value: ethers.parseEther("0.0001") });
 
       console.log(`Now we will act as the node: worker is: ${ctx.acc1.address}, callAi is: ${ctx.callAi.target}`);
+      console.log(`Request ID: ${await ctx.callAi.requestId()}`);
       await ctx.router.connect(ctx.acc1).respondToRequest(
         await ctx.callAi.requestId(),
         1, // success
         'successful response',
-        '12',
+        abi.encode(['string'], ['22']),
         nodeId,
         0,
         0);
@@ -120,7 +126,7 @@ describe("Run and end-to-end call ai and print result", function () {
       console.log(`Now let's check the result`);
       const result = await ctx.callAi.result();
       console.log(`Result: ${result}`);
-      expect(result).to.equal('12');
+      expect(result).to.equal('22');
     });
 
 }); 
