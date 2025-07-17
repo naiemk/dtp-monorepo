@@ -1,0 +1,17 @@
+{
+  "DeployRouter#modelManagerImpl": "0xbCA896ca9f42249F358B4c0b5477411cd27523a6",
+  "DeployRouter#namespaceManagerImpl": "0x2DF8A4a2a0f2289c7Fb8F38A8958eBD38e93015d",
+  "DeployRouter#nodeManagerImpl": "0x2943a6bcF06d0182e19B829be44AB965022cdD36",
+  "DeployRouter#routerImpl": "0x0BD28607a837A82F728843fb8038ae405F131C0f",
+  "DeployRouter#sessionManagerImpl": "0xb651EA6A2dedC682b85C12Eb631249D92CAb4f07",
+  "DeployRouter#modelManagerProxy": "0x6dcd95F868061AE163bb612392FeaB69BF86E76a",
+  "DeployRouter#namespaceManagerProxy": "0xAe7eb95833328017A65E156DF513044E082fC40C",
+  "DeployRouter#routerProxy": "0x1BC1062B3cCDe51b7727098B0488Fd71c9f784B2",
+  "DeployRouter#sessionManagerProxy": "0x344008851A7d648B36F500e598a0b56D6F4C87A8",
+  "DeployRouter#modelManager": "0x6dcd95F868061AE163bb612392FeaB69BF86E76a",
+  "DeployRouter#namespaceManager": "0xAe7eb95833328017A65E156DF513044E082fC40C",
+  "DeployRouter#router": "0x1BC1062B3cCDe51b7727098B0488Fd71c9f784B2",
+  "DeployRouter#sessionManager": "0x344008851A7d648B36F500e598a0b56D6F4C87A8",
+  "DeployRouter#nodeManagerProxy": "0xEa3fDAAc539c4537f09be34825299d250D086e25",
+  "DeployRouter#nodeManager": "0xEa3fDAAc539c4537f09be34825299d250D086e25"
+}

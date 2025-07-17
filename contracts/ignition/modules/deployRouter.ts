@@ -9,7 +9,6 @@ const TOKEN = "0x0000000000000000000000000000000000000000";
 const LockModule = buildModule("DeployRouter", (m) => {
   const owner = m.getParameter("owner", m.getAccount(0));
   const token = m.getParameter("token", TOKEN);
-  console.log("owner", owner.defaultValue);
 
   // Calculate role hashes
   const NAMESPACE_ADMIN_ROLE = keccak256(toUtf8Bytes("NAMESPACE_ADMIN_ROLE"));

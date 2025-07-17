@@ -6,6 +6,8 @@ import "dotenv/config";
 // Import scripts to register tasks
 import "./scripts/deploy";
 
+console.log("ETHERSCAN_API_KEY", process.env.ETHERSCAN_API_KEY);
+
 const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.28",
@@ -48,6 +50,13 @@ const config: HardhatUserConfig = {
         salt: "0x0000000000000000000000000000000000000000000000000000000000000000",
       },
     },
+  },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY || '',
+    // apiKey: {
+    //   sepolia: process.env.ETHERSCAN_API_KEY || '',
+    //   mainnet: process.env.ETHERSCAN_API_KEY || '',
+    // },
   },
 };
 
