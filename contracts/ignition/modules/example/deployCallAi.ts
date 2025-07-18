@@ -5,15 +5,14 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 import { keccak256, toUtf8Bytes } from "ethers";
 
-const TOKEN = "0x0000000000000000000000000000000000000000";
-const DTN_AI = "0x0000000000000000000000000000000000000000";
+const DTN_AI = "0x1BC1062B3cCDe51b7727098B0488Fd71c9f784B2";
 
 const LockModule = buildModule("DeployCallAi", (m) => {
   const owner = m.getParameter("owner", m.getAccount(0));
   const dtn_ai = m.getParameter("dtn_ai", DTN_AI);
 
   // Deploy NamespaceManager, init with owner
-  const dtnAi = m.contract("CallAiExample", [dtn_ai], { id: "callAiExample" });
+  const dtnAi = m.contract("CallAiExample", [dtn_ai], { id: "callAiExample_0" });
   return { dtnAi };
 });
 

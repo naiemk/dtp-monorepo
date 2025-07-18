@@ -2,11 +2,11 @@
 # Maps model names to their processor modules
 
 models:
-  # model api: string[] -> string
+  # model api: api.system.llm-simpletext: string[] -> string
   - model: "model.system.openai-gpt-o3-simpletext"
     processor: "processor_gpt_o3"
   
-  # model api: string[], uint64, uint64 -> bytes
+  # model api: api.system.llm-simpleimage: string[], uint64, uint64 -> bytes
   - model: "model.system.openai-gpt-o3-simpleimage"
     processor: "processor_gpt_o3"
   

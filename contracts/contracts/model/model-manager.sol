@@ -14,6 +14,7 @@ import "../core/inamespace-manager.sol";
  */
 contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDtnAiModels {
     bytes32 public constant NAMESPACE_ADMIN_ROLE = keccak256("NAMESPACE_ADMIN_ROLE");
+    error InvalidModelApi(string modelApi);
 
     /// @custom:storage-location erc7201:dtn.storage.modelmanager.001
     struct ModelManagerStorageV001 {
@@ -125,7 +126,12 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDt
             revert InvalidModelName(modelName);
         }
 
-        bytes32 _modelId = keccak256(abi.encodePacked(fullModelName));
+        bytes32 modelApiId = keccak256(abi.encodePacked(modelApi));
+        if ($.apisById[modelApiId].apiId == bytes32(0)) {
+            revert InvalidModelApi(modelApi);
+        }
+
+        bytes32 _modelId = keccak256(abi.encodePacked(fullModelName, modelApiId));
         $.modelsById[_modelId] = ModelConfig({
             modelNamespaceId: namespaceId,
             modelId: _modelId,

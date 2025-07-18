@@ -13,5 +13,7 @@
   "DeployRouter#router": "0x1BC1062B3cCDe51b7727098B0488Fd71c9f784B2",
   "DeployRouter#sessionManager": "0x344008851A7d648B36F500e598a0b56D6F4C87A8",
   "DeployRouter#nodeManagerProxy": "0xEa3fDAAc539c4537f09be34825299d250D086e25",
-  "DeployRouter#nodeManager": "0xEa3fDAAc539c4537f09be34825299d250D086e25"
+  "DeployRouter#nodeManager": "0xEa3fDAAc539c4537f09be34825299d250D086e25",
+  "DeployCallAi#callAiExample": "0x80439CDD3576A5F4DA5D6f89718e598175dfBf7D",
+  "DeployCallAi#callAiExample_0": "0x84Eadc4bcc8A3Bc6E93D5103c228d17e2B2b5d33"
 }
