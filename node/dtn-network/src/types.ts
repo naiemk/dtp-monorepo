@@ -1,3 +1,4 @@
+import type { BytesLike } from "ethers";
 import { ethers } from "ethers";
 
 export interface CustomModelConfig {
@@ -6,6 +7,7 @@ export interface CustomModelConfig {
 }
 
 export interface ModelApiConfig {
+    name: string;
     specs: string;
     docs: string;
 }
@@ -13,7 +15,7 @@ export interface ModelApiConfig {
 export interface ModelConfig {
     name: string;
     priceMinPerByteIn: number;
-    priceMaxPerByteOut: number;
+    priceMinPerByteOut: number;
     host: string;
 }
 
@@ -36,18 +38,19 @@ export interface NodeConfig {
         chainId: number;
         nodeManagerAddress: string;
         modelManagerAddress: string;
+        namespaceManagerAddress: string;
         routerAddress: string;
     };
     ipfs: IpfsConfig;
-    modelApis: { [key: string]: ModelApiConfig };
+    modelApis: ModelApiConfig [];
     customModels: CustomModelConfig[];
     node: {
         username: string;
         nodeName: string;
         worker: string;
+        models: ModelConfig[];
+        trustNamespaces: string[];
     };
-    models: ModelConfig[];
-    trustNamespaces: string[];
     maxLookBackRequests?: number; // Maximum number of requests to process in a single call
 }
 
@@ -153,8 +156,8 @@ export interface RouterRequest {
         aggregationType: number;
     };
     request: {
-        call: string;
-        extraParams: string;
+        call: BytesLike;
+        extraParams: BytesLike;
         calltype: number;
         feePerByteReq: bigint;
         feePerByteRes: bigint;

@@ -131,7 +131,7 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDt
             revert InvalidModelApi(modelApi);
         }
 
-        bytes32 _modelId = keccak256(abi.encodePacked(fullModelName, modelApiId));
+        bytes32 _modelId = keccak256(abi.encodePacked(fullModelName));
         $.modelsById[_modelId] = ModelConfig({
             modelNamespaceId: namespaceId,
             modelId: _modelId,

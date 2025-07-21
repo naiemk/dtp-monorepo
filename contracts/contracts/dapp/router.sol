@@ -164,7 +164,7 @@ contract RouterUpgradeable is
         return $.requests[requestId];
     }
 
-    function setDependencies(address nodeManager, address sessionManager, address modelManager, address namespaceManager) external onlyOwner {
+    function setDependencies(address nodeManager, address sessionManager, address modelManager) external onlyOwner {
         RouterStorageV001 storage $ = getRouterStorageV001();
         $.nodeManager = nodeManager;
         $.sessionManager = sessionManager;
@@ -287,13 +287,17 @@ contract RouterUpgradeable is
         requestData.completed = true;
         
         // Extract final response
-        IDtnAi.Response memory finalResponse = strategy.extractSingleResponse(
-            requestId,
-            $.responses[requestId]
-        );
-
-        // Store the final response and mark as completed
-        requestData.finalResponse = finalResponse;
+        if (status == ResponseStatus.SUCCESS) {
+            IDtnAi.Response memory finalResponse = strategy.extractSingleResponse(
+                requestId,
+                $.responses[requestId]
+            );
+            requestData.finalResponse = finalResponse;
+        } else {
+            // For failure, just take the first response (should be only one)
+            require($.responses[requestId].length > 0, "No responses found");
+            requestData.finalResponse = $.responses[requestId][0];
+        }
 
         // Call callback
         if (status == ResponseStatus.SUCCESS) { // Success

@@ -337,4 +337,14 @@ contract NodeManagerUpgradeable is
     function getNodeModels(bytes32 nodeId) external view override returns (bytes32[] memory) {
         return getNodeStorageV001().nodeModels[nodeId];
     }
+
+    function getUserId(string calldata username) external view returns (bytes32) {
+        NodeStorageV001 storage $ = getNodeStorageV001();
+        bytes32 userId = keccak256(abi.encodePacked(username));
+        return bytes($.users[userId]).length != 0 ? userId : bytes32(0);
+    }
+
+    function getUserName(bytes32 userId) external view returns (string memory) {
+        return getNodeStorageV001().users[userId];
+    }
 }

@@ -1,5 +1,8 @@
-import { type NodeConfig, type RouterRequest } from "./types";
+import { Logger, LogLevel } from "./logger";
+import { namespaceToId, type ModelConfig, type NodeConfig, type RouterRequest } from "./types";
 import { ethers } from "ethers";
+
+const MAX_LOOK_BACK_REQUESTS = 1000;
 
 // Router contract interface
 interface RouterContract {
@@ -23,8 +26,14 @@ export class RequestReader {
     private nodeId: string | undefined;
     private cachedPendingRequestsLength: number = 0;
     private cachedCompletedRequestsLength: number = 0;
+    private models: Map<string, ModelConfig> = new Map();
+    private logger: Logger;
 
-    constructor(private readonly config: NodeConfig) {
+    constructor(
+        private readonly config: NodeConfig,
+        logLevel: LogLevel = LogLevel.INFO,
+    ) {
+        this.logger = new Logger(logLevel);
         this.provider = new ethers.JsonRpcProvider(config.network.rpcUrl);
         this.routerContract = new ethers.Contract(
             config.network.routerAddress,
@@ -33,13 +42,16 @@ export class RequestReader {
                 "function getPendingRequests(uint256 from, uint256 to) view returns (bytes32[])",
                 "function getCompletedRequestsLength() view returns (uint256)",
                 "function getCompletedRequests(uint256 from, uint256 to) view returns (bytes32[])",
-                "function getRequest(bytes32 requestId) view returns (tuple(uint256 sessionId, address user, bool completed, bytes32 modelId, tuple(bytes32[] trustNamespaceIds, bytes32[] trustedNodeIds, uint32 redundancy, uint8 confidenceLevel, uint8 aggregationType) routing, tuple(bytes call, uint8 calltype, uint256 feePerByteReq, uint256 feePerByteRes, uint256 totalFeePerRes) request, tuple(bytes4 suscess, bytes4 failure, address target) callback, uint256 callbackGas, uint256 responseCount, tuple(uint8 status, string message, string response, bytes32 nodeId, uint256 timestamp) finalResponse))"
+                "function getRequest(bytes32 requestId) view returns (tuple(uint256 sessionId, address user, bool completed, bytes32 modelId, tuple(bytes32[] trustNamespaceIds, bytes32[] trustedNodeIds, uint32 redundancy, uint8 confidenceLevel, uint8 aggregationType) routing, tuple(bytes call, bytes extraParams, uint8 calltype, uint256 feePerByteReq, uint256 feePerByteRes, uint256 totalFeePerRes) request, tuple(bytes4 suscess, bytes4 failure, address target) callback, uint256 callbackGas, uint256 responseCount, tuple(uint8 status, string message, string response, bytes32 nodeId, uint256 timestamp) finalResponse))"
             ],
             this.provider
         ) as unknown as RouterContract;
 
         // Calculate node ID from worker address
-        this.nodeId = ethers.keccak256(ethers.toUtf8Bytes(this.config.node.worker));
+        this.nodeId = namespaceToId(`node.${this.config.node.username}.${this.config.node.nodeName}`);
+        this.models = new Map(this.config.node.models.map(model => [namespaceToId(model.name), model]));
+        this.logger.info(`RequestReader: Initialized with node ID ${this.nodeId}`);
+        this.logger.info(`RequestReader: Serving models: ${Array.from(this.models.keys()).join(", ")}`);
     }
 
     /**
@@ -81,7 +93,7 @@ export class RequestReader {
             
             if (from < to) {
                 // Apply maxLookBackRequests limit if configured
-                const maxLookBack = this.config.maxLookBackRequests || Number.MAX_SAFE_INTEGER;
+                const maxLookBack = this.config.maxLookBackRequests || MAX_LOOK_BACK_REQUESTS;
                 const actualFrom = Math.max(Number(from), Number(to) - maxLookBack);
                 
                 const requestIds = await this.routerContract.getPendingRequests(
@@ -106,7 +118,7 @@ export class RequestReader {
             
             if (from < to) {
                 // Apply maxLookBackRequests limit if configured
-                const maxLookBack = this.config.maxLookBackRequests || Number.MAX_SAFE_INTEGER;
+                const maxLookBack = this.config.maxLookBackRequests || MAX_LOOK_BACK_REQUESTS;
                 const actualFrom = Math.max(Number(from), Number(to) - maxLookBack);
                 
                 const requestIds = await this.routerContract.getCompletedRequests(
@@ -128,6 +140,8 @@ export class RequestReader {
         for (const requestId of pendingRequests) {
             try {
                 const request = await this.routerContract.getRequest(requestId);
+                this.logger.debug(`Request: ${request.request}`);
+                this.logger.debug(`ExtraParams: ${request.request.extraParams}`);
                 
                 // Skip if request is already completed
                 if (request.completed) {
@@ -141,7 +155,8 @@ export class RequestReader {
                 }
             } catch (error) {
                 console.error(`Error processing request ${requestId}:`, error);
-                continue;
+                // continue;
+                throw error;
             }
         }
 
@@ -156,14 +171,15 @@ export class RequestReader {
     /**
      * Check if this node can serve the given request based on configuration
      */
-    private async canServeRequest(request: any): Promise<boolean> {
+    private async canServeRequest(request: RouterRequest): Promise<boolean> {
         if (!this.nodeId) {
-            return false;
+            throw new Error("Node ID is not set");
         }
 
         // 1. Check if we serve the requested model
         const servesModel = this.servesModel(request.modelId);
         if (!servesModel) {
+            this.logger.debug(`Node ${this.nodeId} does not serve model ${request.modelId}`);
             return false;
         }
 
@@ -173,12 +189,14 @@ export class RequestReader {
             request.routing.trustedNodeIds
         );
         if (!hasTrustNamespace) {
+            this.logger.debug(`Node ${this.nodeId} does not belong to the relevant trust namespace ${request.routing.trustNamespaceIds}`);
             return false;
         }
 
         // 3. Check if the offered price is within our range
-        const priceInRange = this.isPriceInRange(request.request);
+        const priceInRange = this.isPriceInRange(request);
         if (!priceInRange) {
+            this.logger.debug(`Price for request ${request.sessionId} not in range. Offerred ${request.request.feePerByteReq}`);
             return false;
         }
 
@@ -189,10 +207,7 @@ export class RequestReader {
      * Check if this node serves the requested model based on config
      */
     private servesModel(modelId: string): boolean {
-        // Check if any of our configured models match the requested model
-        return this.config.models.some(model => 
-            ethers.keccak256(ethers.toUtf8Bytes(model.name)) === modelId
-        );
+        return this.models.has(modelId);
     }
 
     /**
@@ -203,52 +218,40 @@ export class RequestReader {
         trustedNodeIds: string[]
     ): boolean {
         if (!this.nodeId) {
-            return false;
+            throw new Error("Node ID is not set");
         }
 
         // If specific trusted nodes are specified, check if we're one of them
         if (trustedNodeIds.length > 0) {
-            return trustedNodeIds.includes(this.nodeId);
+            if (trustedNodeIds.includes(this.nodeId)) {
+                return true;
+            }
         }
 
         // Check if we have ALL the trust namespaces in the request
         // Convert our trust namespaces to their hash values for comparison
-        const ourTrustNamespaceHashes = this.config.trustNamespaces.map(namespace =>
-            ethers.keccak256(ethers.toUtf8Bytes(namespace))
-        );
+        const ourTrustNamespaceHashes = this.config.node.trustNamespaces.map(namespace => namespaceToId(namespace));
 
         for (const namespaceId of trustNamespaceIds) {
-            if (!ourTrustNamespaceHashes.includes(namespaceId)) {
-                return false;
+            if (ourTrustNamespaceHashes.includes(namespaceId)) {
+                return true;
             }
         }
 
-        return true;
+        return false;
     }
 
     /**
      * Check if the offered price is within our configured range
      */
-    private isPriceInRange(request: any): boolean {
-        // Find the model configuration for this request
-        const modelConfig = this.config.models.find(model => 
-            ethers.keccak256(ethers.toUtf8Bytes(model.name)) === request.modelId
-        );
+    private isPriceInRange(request: RouterRequest): boolean {
+        const modelConfig = this.models.get(request.modelId);
 
         if (!modelConfig) {
             return false;
         }
 
-        // Check if request fee per byte is within our minimum range
-        if (request.feePerByteReq < BigInt(modelConfig.priceMinPerByteIn)) {
-            return false;
-        }
-
-        // Check if response fee per byte is within our maximum range
-        if (request.feePerByteRes > BigInt(modelConfig.priceMaxPerByteOut)) {
-            return false;
-        }
-
-        return true;
+        return request.request.feePerByteReq >= BigInt(modelConfig.priceMinPerByteIn) &&
+            request.request.feePerByteRes >= BigInt(modelConfig.priceMinPerByteOut);
     }
 }

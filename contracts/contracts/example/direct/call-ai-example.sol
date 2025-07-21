@@ -14,6 +14,7 @@ contract CallAiExample is WithDtnAi {
     event Error(bytes32 requestId);
 
     string public result;
+    string public error;
     uint256 public sessionId;
     bytes32 public requestId;
     
@@ -36,7 +37,7 @@ contract CallAiExample is WithDtnAi {
             keccak256(abi.encodePacked(model)), // the model ID
             DtnDefaults.defaultCustomNodesValidatedAny(nodes),
             IDtnAi.DtnRequest({
-                call: abi.encode("text {0:uint8} and {1:address}", prompt),
+                call: abi.encode(["text {0:uint8} and {1:address}", prompt]),
                 extraParams: abi.encode(12, address(this)),
                 calltype: IDtnAi.CallType.DIRECT, 
                 feePerByteReq: 0.001 * 10**18,
@@ -61,6 +62,8 @@ contract CallAiExample is WithDtnAi {
     }
 
     function aiError(bytes32 _requestId) external onlyDtn {
+        (, string memory message, ) = ai.fetchResponse(_requestId);
+        error = message;
         emit Error(_requestId);
     }
 }

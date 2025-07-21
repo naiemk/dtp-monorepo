@@ -3,13 +3,31 @@
 import { Command } from 'commander';
 import yaml from 'yaml';
 import fs from 'fs';
-import path from 'path';
 import { DtnService } from './dtnService';
 import { RequestReader } from './requestReader';
 import { ResponseGenerator } from './responseGenerator';
 import { RequestParser } from './RequestParser';
 import { configureNode } from './scripts/confiureNode';
 import type { NodeConfig } from './types';
+import dotenv from 'dotenv';
+import { Logger, LogLevel } from './logger';
+
+// Load environment variables from multiple possible config files
+const envFiles = ['.env', '.env.production', 'localConfig/.env'];
+let envLoaded = false;
+
+for (const envFile of envFiles) {
+    if (fs.existsSync(envFile)) {
+        dotenv.config({ path: envFile });
+        console.log(`📄 Loaded environment from: ${envFile}`);
+        envLoaded = true;
+        break;
+    }
+}
+
+if (!envLoaded) {
+    console.warn('⚠️  No environment file found. Tried:', envFiles.join(', '));
+}
 
 const program = new Command();
 
@@ -22,20 +40,39 @@ program
 // Global options
 program
     .option('-c, --config <path>', 'Path to configuration file', './nodeConfig.yaml')
-    .option('-v, --verbose', 'Enable verbose logging');
+    .option('-v, --verbose', 'Enable verbose logging')
+    .option('--log-level <level>', 'Set log level (error, warn, info, debug, trace)', 'info');
+
+/**
+ * Utility to parse log level string to LogLevel enum
+ */
+function parseLogLevel(level: string): LogLevel {
+    switch (level.toLowerCase()) {
+        case 'error': return LogLevel.ERROR;
+        case 'warn': return LogLevel.WARN;
+        case 'info': return LogLevel.INFO;
+        case 'debug': return LogLevel.DEBUG;
+        case 'trace': return LogLevel.TRACE;
+        default:
+            console.warn(`Unknown log level: ${level}, defaulting to INFO`);
+            return LogLevel.INFO;
+    }
+}
 
 /**
  * Initialize logging configuration
  */
-function initializeLogging(verbose: boolean): void {
+function initializeLogging(verbose: boolean, logLevelStr: string): LogLevel {
+    let logLevel: LogLevel;
     if (verbose) {
         console.log('🔧 Initializing logging with verbose mode...');
-        // Set log level to debug for verbose mode
-        process.env.LOG_LEVEL = 'debug';
+        logLevel = LogLevel.DEBUG;
     } else {
-        console.log('🔧 Initializing logging...');
-        process.env.LOG_LEVEL = 'info';
+        logLevel = parseLogLevel(logLevelStr);
+        console.log(`🔧 Initializing logging with log level: ${LogLevel[logLevel]}`);
     }
+    process.env.LOG_LEVEL = LogLevel[logLevel].toLowerCase();
+    return logLevel;
 }
 
 /**
@@ -85,14 +122,14 @@ function validateEnvironmentVariables(config: NodeConfig): void {
 /**
  * Initialize DTN service dependencies
  */
-function initializeDtnService(config: NodeConfig): DtnService {
+function initializeDtnService(config: NodeConfig, logLevel: LogLevel): DtnService {
     console.log('🔧 Initializing DTN service dependencies...');
     
     try {
-        const requestReader = new RequestReader(config);
-        const requestParser = new RequestParser(config);
-        const responseGenerator = new ResponseGenerator(config, requestParser);
-        const dtnService = new DtnService(config, requestReader, responseGenerator);
+        const requestReader = new RequestReader(config, logLevel);
+        const requestParser = new RequestParser(config, logLevel);
+        const responseGenerator = new ResponseGenerator(config, requestParser, logLevel);
+        const dtnService = new DtnService(config, requestReader, responseGenerator, logLevel);
         
         console.log('✅ DTN service dependencies initialized');
         return dtnService;
@@ -104,14 +141,15 @@ function initializeDtnService(config: NodeConfig): DtnService {
 /**
  * Run DTN service once
  */
-async function runOnce(config: NodeConfig): Promise<void> {
+async function runOnce(config: NodeConfig, logLevel: LogLevel): Promise<void> {
     console.log('🚀 Running DTN service once...');
     
     try {
-        const dtnService = initializeDtnService(config);
+        const dtnService = initializeDtnService(config, logLevel);
         await dtnService.processRequests();
         console.log('✅ DTN service completed successfully');
     } catch (error) {
+        console.error(error);
         console.error('❌ DTN service failed:', error instanceof Error ? error.message : 'Unknown error');
         process.exit(1);
     }
@@ -120,10 +158,10 @@ async function runOnce(config: NodeConfig): Promise<void> {
 /**
  * Run DTN service in a loop
  */
-async function runLoop(config: NodeConfig, intervalSeconds: number = 5): Promise<void> {
+async function runLoop(config: NodeConfig, intervalSeconds: number = 5, logLevel: LogLevel): Promise<void> {
     console.log(`🔄 Running DTN service in loop (interval: ${intervalSeconds}s)...`);
     
-    const dtnService = initializeDtnService(config);
+    const dtnService = initializeDtnService(config, logLevel);
     
     // Handle graceful shutdown
     process.on('SIGINT', () => {
@@ -170,12 +208,12 @@ program
     .command('run-once')
     .description('Run the DTN service once')
     .action(async (options) => {
-        const { config: configPath, verbose } = options.parent?.opts() || {};
+        const { config: configPath, verbose, logLevel } = program.opts();
         
         try {
-            initializeLogging(verbose);
+            const selectedLogLevel = initializeLogging(verbose, logLevel);
             const config = loadConfiguration(configPath);
-            await runOnce(config);
+            await runOnce(config, selectedLogLevel);
         } catch (error) {
             console.error('❌ Command failed:', error instanceof Error ? error.message : 'Unknown error');
             process.exit(1);
@@ -187,7 +225,7 @@ program
     .description('Run the DTN service in a continuous loop')
     .option('-i, --interval <seconds>', 'Interval between iterations in seconds', '5')
     .action(async (options) => {
-        const { config: configPath, verbose } = options.parent?.opts() || {};
+        const { config: configPath, verbose, logLevel } = program.opts();
         const interval = parseInt(options.interval);
         
         if (isNaN(interval) || interval < 1) {
@@ -196,9 +234,9 @@ program
         }
         
         try {
-            initializeLogging(verbose);
+            const selectedLogLevel = initializeLogging(verbose, logLevel);
             const config = loadConfiguration(configPath);
-            await runLoop(config, interval);
+            await runLoop(config, interval, selectedLogLevel);
         } catch (error) {
             console.error('❌ Command failed:', error instanceof Error ? error.message : 'Unknown error');
             process.exit(1);
@@ -209,10 +247,10 @@ program
     .command('configure-node')
     .description('Configure the node on the blockchain')
     .action(async (options) => {
-        const { config: configPath, verbose } = options.parent?.opts() || {};
+        const { config: configPath, verbose } = program.opts();
         
         try {
-            initializeLogging(verbose);
+            initializeLogging(verbose, 'info'); // ConfigureNodeCommand doesn't have --log-level
             await configureNodeCommand(configPath);
         } catch (error) {
             console.error('❌ Command failed:', error instanceof Error ? error.message : 'Unknown error');

@@ -1,6 +1,6 @@
 import fs from 'fs';
 import yaml from 'yaml';
-import { ethers } from 'ethers';
+import { ethers, ZeroAddress } from 'ethers';
 import type { NodeConfig, ModelApiConfig, CustomModelConfig } from '../types';
 
 /**
@@ -11,6 +11,10 @@ import type { NodeConfig, ModelApiConfig, CustomModelConfig } from '../types';
  * 3. Register model APIs if not already registered
  * 3. Register models
  */
+
+const NAMESPACE_MANAGER_ABI = [
+    "function getNamespaceOwner(bytes32 namespaceId) external view returns (address)",
+];
 
 // Contract ABIs - simplified versions for the functions we need
 const NODE_MANAGER_ABI = [
@@ -44,24 +48,34 @@ function loadConfig(configPath: string): NodeConfig {
  */
 async function registerUserIfNotExists(ownerWallet: ethers.Wallet, username: string, config: NodeConfig) {
     console.log(`Checking if user '${username}' is already registered...`);
-    
+    const namespaceManager = new ethers.Contract(config.network.namespaceManagerAddress, NAMESPACE_MANAGER_ABI, ownerWallet);
     const nodeManager = new ethers.Contract(config.network.nodeManagerAddress, NODE_MANAGER_ABI, ownerWallet);
     
     try {
         // Try to get user info to check if registered
-        const userId = ethers.solidityPackedKeccak256(['string'], [`node.${username}`]);
-        await nodeManager.getNode!(userId);
-        console.log(`User '${username}' is already registered.`);
-    } catch (error) {
+        const nodeParentNamespaceId = ethers.solidityPackedKeccak256(['string'], [`node.${username}`]);
+        const owner = await namespaceManager.getNamespaceOwner!(nodeParentNamespaceId);
+        console.log(`NS owner for "node.${username}"`);
+        if (owner.toString() !== ZeroAddress.toString()) {
+            console.log(`User '${username}' is already registered.`);
+            return;
+        }
         console.log(`User '${username}' is not registered. Registering now...`);
         try {
-            const tx = await nodeManager.registerUser!(`node.${username}`, ownerWallet.address);
+            console.log(`Registering user '${username}, ${ownerWallet.address}'...`);
+            const tx = await nodeManager.registerUser!(username, ownerWallet.address);
+            console.log(`TX hash: ${tx.hash}`);
             await tx.wait();
             console.log(`✅ User '${username}' registered successfully. Transaction: ${tx.hash}`);
+            const owner = await namespaceManager.getNamespaceOwner!(nodeParentNamespaceId);
+            console.log(`NS owner for "node.${username}"`, owner);
         } catch (registerError) {
             console.error(`❌ Failed to register user '${username}':`, registerError);
             throw registerError;
         }
+    } catch (error) {
+        console.error(`❌ Failed to get user info:`, error);
+        throw error;
     }
 }
 
@@ -76,9 +90,11 @@ async function registerNodeIfNotExists(ownerWallet: ethers.Wallet, nodeName: str
     try {
         // Try to get node info to check if registered
         const nodeId = ethers.solidityPackedKeccak256(['string'], [`node.${config.node.username}.${nodeName}`]);
-        await nodeManager.getNode!(nodeId);
-        console.log(`Node '${nodeName}' is already registered.`);
-    } catch (error) {
+        const nodeInfo = await nodeManager.getNode!(nodeId);
+        if (nodeInfo.owner.toString() !== ZeroAddress.toString()) {
+            console.log(`Node '${nodeName}' is already registered.`);
+            return;
+        }
         console.log(`Node '${nodeName}' is not registered. Registering now...`);
         try {
             // Note: This might require a stake amount, but we'll use 0 for now
@@ -89,18 +105,22 @@ async function registerNodeIfNotExists(ownerWallet: ethers.Wallet, nodeName: str
             console.error(`❌ Failed to register node '${nodeName}':`, registerError);
             throw registerError;
         }
+    } catch (error) {
+        console.error(`❌ Failed to get node info:`, error);
+        throw error;
     }
 }
 
 /**
  * Register model APIs if not already registered
  */
-async function registerModelApisIfNotExists(ownerWallet: ethers.Wallet, modelApis: { [key: string]: ModelApiConfig }, config: NodeConfig) {
+async function registerModelApisIfNotExists(ownerWallet: ethers.Wallet, modelApis: ModelApiConfig[], config: NodeConfig) {
     console.log('Checking and registering model APIs...');
     
     const modelManager = new ethers.Contract(config.network.modelManagerAddress, MODEL_MANAGER_ABI, ownerWallet);
     
-    for (const [apiName, apiConfig] of Object.entries(modelApis)) {
+    for (const apiConfig of modelApis) {
+        const apiName = apiConfig.name;
         console.log(`Checking model API '${apiName}'...`);
         try {
             // Try to register the API - if it fails, it might already exist
@@ -221,11 +241,11 @@ export async function configureNode(configPath: string) {
     if (ownerWallet) {
         await registerUserIfNotExists(ownerWallet, config.node.username, config);
         await registerNodeIfNotExists(ownerWallet, config.node.nodeName, config.node.worker, config);
-        await registerModelApisIfNotExists(ownerWallet, config.modelApis, config);
-        await registerCustomModelsIfNotExists(ownerWallet, config.customModels, config);
+        await registerModelApisIfNotExists(ownerWallet, config?.modelApis || [], config);
+        await registerCustomModelsIfNotExists(ownerWallet, config?.customModels || [], config);
         const nodeId = ethers.solidityPackedKeccak256(['string'],
             [`node.${config.node.username}.${config.node.nodeName}`]);
-        const modelIds = config.models.map(model =>
+        const modelIds = config.node.models.map(model =>
             ethers.solidityPackedKeccak256(['string'], [model.name]));
         await setNodeModelsIfNotSet(ownerWallet, nodeId, modelIds, config);
     } else {

@@ -1,6 +1,8 @@
 import { AbiCoder, ethers } from "ethers";
 import type { NodeConfig, RouterRequest } from "./types";
 import type { AiRequest } from "./aiClient";
+import { Logger, LogLevel } from "./logger";
+import { ERROR_CODES } from "./errors";
 
 interface ModelApi {
     apiNamespaceId: string;
@@ -14,17 +16,27 @@ interface ModelManagerContract {
     getModelAPI(modelId: string): Promise<ModelApi>;
 }
 
+// Custom error for ABI decoding
+export class AbiDecodeError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'AbiDecodeError';
+    }
+}
+
 export class RequestParser {
     private modelManagerContract: ModelManagerContract | undefined;
     private modelAPIs: { [modelId: string]: ModelApi } = {};
     private provider: ethers.JsonRpcProvider | undefined;
+    private logger: Logger;
 
-    constructor(config: NodeConfig) {
+    constructor(private readonly config: NodeConfig, logLevel: LogLevel = LogLevel.INFO) {
+        this.logger = new Logger(logLevel);
         this.provider = new ethers.JsonRpcProvider(config.network.rpcUrl);
         this.modelManagerContract = new ethers.Contract(
             config.network.modelManagerAddress,
             [
-                "function getModelAPI(bytes32 modelId) view returns (tuple(string modelNamespaceId, bytes32 modelId, bytes32 modelApiId, string modelName))"
+                "function getModelAPI(bytes32 modelId) view returns (tuple(bytes32 apiNamespaceId,string apiName,bytes32 apiId,string specs,string docs))"
             ],
             this.provider
         ) as unknown as ModelManagerContract;
@@ -34,20 +46,32 @@ export class RequestParser {
         // Get the model API specification
         let modelApi = this.modelAPIs[request.modelId];
         if (!modelApi) {
+            this.logger.debug(`Getting model API for model ${request.modelId} from model manager contract ${this.config.network.modelManagerAddress}`);
             modelApi = await this.modelManagerContract!.getModelAPI(request.modelId);
             if (!modelApi) {
                 throw new Error(`Model API not found for model ${request.modelId}`);
             }
             this.modelAPIs[request.modelId] = modelApi;
+            this.logger.debug(`Received model API for model ${request.modelId}: ${JSON.stringify(modelApi)}`);
         }
 
         // Parse the model API specs to get parameter types
         const apiParameterTypes = modelApi.specs.split('->')[0]!.replace(/\s/g, "").split(",");
         const call = request.request.call;
         const extraParams = request.request.extraParams;
-        
-        // Decode the main call parameters
-        const modelParams = AbiCoder.defaultAbiCoder().decode(apiParameterTypes, call);
+
+        console.log('Decoding call', call);
+        console.log('Decoding extra params', extraParams); 
+        console.log('parameter types', apiParameterTypes);
+        let modelParams;
+        try {
+            // Decode the main call parameters
+            modelParams = AbiCoder.defaultAbiCoder().decode(apiParameterTypes, call);
+        } catch (err) {
+            this.logger.error(`ABI decode error for call: ${err}`);
+            throw new AbiDecodeError(`${ERROR_CODES.P0011.code}: ${ERROR_CODES.P0011.message}`);
+        }
+        this.logger.debug(`Model params: ${JSON.stringify(modelParams)}`);
         
         // Extract parameter types from decoded values that contain placeholders
         const extractedParameterTypes: string[] = [];
@@ -55,10 +79,16 @@ export class RequestParser {
         // Process all decoded parameters to extract types
         modelParams.forEach(param => this.extractTypesFromValue(param, extractedParameterTypes));
         
-        // Decode the extra parameters using the extracted parameter types
-        const extraModelParams = extractedParameterTypes.length > 0 
-            ? AbiCoder.defaultAbiCoder().decode(extractedParameterTypes, extraParams)
-            : [];
+        let extraModelParams: any[] = [];
+        if (extractedParameterTypes.length > 0) {
+            try {
+                // Decode the extra parameters using the extracted parameter types
+                extraModelParams = AbiCoder.defaultAbiCoder().decode(extractedParameterTypes, extraParams);
+            } catch (err) {
+                this.logger.error(`ABI decode error for extraParams: ${err}`);
+                throw new AbiDecodeError(`${ERROR_CODES.P0011.code}: ${ERROR_CODES.P0011.message}`);
+            }
+        }
         
         // Apply placeholder replacement to all parameters
         const processedParams = modelParams.map(param => this.replacePlaceholders(param, extraModelParams));
@@ -68,6 +98,8 @@ export class RequestParser {
             parameters: processedParams,
             types: apiParameterTypes,
         };
+        
+        this.logger.debug(`Formatted call: ${JSON.stringify(formattedCall)}`);
         
         return {
             requestId: requestId,

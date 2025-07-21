@@ -62,12 +62,13 @@ async function deployRouter() {
   );
   
   // Set up dependencies
-  await router.setDependencies(nodeManager.target, sessionManager.target, modelManager.target, namespaceManager.target);
+  await router.setDependencies(nodeManager.target, sessionManager.target, modelManager.target);
   await modelManager.setDependencies(router.target, namespaceManager.target);
   await sessionManager.addDtnContracts([router.target]);
   await namespaceManager.addDtnContracts([router.target, sessionManager.target, nodeManager.target]);
 
-  // Register a model
+  // Register the namespace, then the model API, then the model
+  await modelManager.registerModelAPI('api.system', 'openai-gpt-4', 'specs', 'docs');
   await modelManager.registerModel('model.system', 'openai-gpt-4', 'api.system.openai-gpt-4');
 
   // Deploy CallAiExample
@@ -127,6 +128,32 @@ describe("Run and end-to-end call ai and print result", function () {
       const result = await ctx.callAi.result();
       console.log(`Result: ${result}`);
       expect(result).to.equal('22');
+    });
+
+    it("Should show execution error, when node rejects", async function () {
+      const ctx = await deployRouter();
+      await ctx.nodeManager.registerUser("tester", ctx.acc1.address);
+      await ctx.nodeManager.registerNode("tester", "node1", ctx.acc1.address);
+      const nodeId = ethers.solidityPackedKeccak256(['string'], ['node.tester.node1']);
+      await ctx.nodeManager.setNodeModels(nodeId, [ethers.solidityPackedKeccak256(['string'], ['model.system.openai-gpt-4'])]);
+
+      await ctx.token.approve(ctx.callAi.target, ethers.parseEther("100"));
+      await ctx.callAi.doCallAi("What is A+B, if A=10 and B=12. Write only one single number as response.",
+        "node.tester.node1",
+        "model.system.openai-gpt-4",
+        { value: ethers.parseEther("0.0001") });
+
+      await ctx.router.connect(ctx.acc1).respondToRequest(
+        await ctx.callAi.requestId(),
+        2, // FAILURE
+        'ER101: Node errored',
+        '0x',
+        nodeId,
+        0,
+        0);
+
+      const error = await ctx.callAi.error();
+      expect(error).to.equal('ER101: Node errored');
     });
 
 }); 

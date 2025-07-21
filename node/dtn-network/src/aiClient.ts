@@ -1,4 +1,5 @@
 import { namespaceToId, type NodeConfig, type RouterRequest } from "./types";
+import { Logger, LogLevel } from "./logger";
 
 export interface AiResponse {
     requestId: string;
@@ -17,10 +18,14 @@ export interface AiRequest {
 }
 
 export class AiClient {
-    constructor(private readonly host: string) {
+    private logger: Logger;
+
+    constructor(private readonly host: string, logLevel: LogLevel = LogLevel.INFO) {
+        this.logger = new Logger(logLevel);
     }
 
     async request(request: AiRequest): Promise<AiResponse> {
+        this.logger.debug(`AI client request to ${this.host}: ${JSON.stringify(request)}`);
         const response = await fetch(this.host, {
             method: "POST",
             headers: {
@@ -38,7 +43,7 @@ export class AiClient {
 }
 
 export function createAiClient(config: NodeConfig, modelId: string): AiClient {
-    const modelConfig = config.models.find(m => namespaceToId(m.name) === modelId);
+    const modelConfig = config.node.models.find(m => namespaceToId(m.name) === modelId);
     if (!modelConfig) {
         throw new Error(`Model ${modelId} not found in config`);
     }

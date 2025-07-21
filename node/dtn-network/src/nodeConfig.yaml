@@ -13,13 +13,14 @@ network:
   chainId: 1337
   nodeManagerAddress: 0x1234567890123456789012345678901234567890
   modelManagerAddress: 0x1234567890123456789012345678901234567890
+  namespaceManagerAddress: 0x1234567890123456789012345678901234567890
 
 model-apis:
-  - "api.node.alice.my-custom-api-text":
+  - name: "api.node.alice.my-custom-api-text"
     specs: "string[] -> string"
     docs: |
       prompt: provide prompt (multiple string will be joined)
-  - "api.node.alice.my-custom-api-image":
+  - name: "api.node.alice.my-custom-api-image"
     specs: "string[], uint8, uint64, uint64 -> bytes"
     docs: |
       prompt: provide prompt (multiple string will be joined)
@@ -28,7 +29,7 @@ model-apis:
       dimension-y: height of the image
 
 custom-models:
-  - name: "model.node.alice.my-custom-model":
+  - name: "model.node.alice.my-custom-model"
     api: "api.node.alice.my-custom-api"
 
 node:

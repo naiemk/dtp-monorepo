@@ -1,9 +1,11 @@
 import { ethers } from "ethers";
-import { createAiClient } from "./aiClient";
+import { AiClient, createAiClient, type AiRequest } from "./aiClient";
 import { IpfsClient } from "./ipfsClient";
-import type { NodeConfig, RouterRequest } from "./types";
+import { namespaceToId, type NodeConfig, type RouterRequest } from "./types";
 import type { RequestParser } from "./RequestParser";
+import { AbiDecodeError } from "./RequestParser";
 import { AbiCoder } from "ethers";
+import { Logger, LogLevel } from "./logger";
 
 // Router contract interface for responding to requests
 interface RouterContract {
@@ -24,20 +26,25 @@ export class ResponseGenerator {
     private routerContract: RouterContract | undefined;
     private nodeId: string | undefined;
     private ipfsClient: IpfsClient | undefined;
+    private logger: Logger;
 
-    constructor(private readonly config: NodeConfig, private readonly requestParser: RequestParser) {
+    constructor(private readonly config: NodeConfig, private readonly requestParser: RequestParser, logLevel: LogLevel = LogLevel.INFO) {
+        this.logger = new Logger(logLevel);
         this.provider = new ethers.JsonRpcProvider(config.network.rpcUrl);
         const privateKey = process.env[config.keys.workerPrivateKey];
         if (!privateKey) {
             throw new Error("Worker private key is not set");
         }
         this.wallet = new ethers.Wallet(privateKey, this.provider);
-        
+
+        this.logger.info(`ResponseGenerator: Initializing router contract with address ${config.network.routerAddress}`);
+        this.logger.info(`ResponseGenerator: Using worker address ${this.wallet?.address}`);
+
         // Initialize router contract
         this.routerContract = new ethers.Contract(
             config.network.routerAddress,
             [
-                "function respondToRequest(bytes32 requestId, uint8 status, string message, string response, bytes32 nodeId, uint256 requestSize, uint256 responseSize) external"
+                "function respondToRequest(bytes32 requestId, uint8 status, string message, bytes response, bytes32 nodeId, uint256 requestSize, uint256 responseSize) external"
             ],
             this.wallet
         ) as unknown as RouterContract;
@@ -46,7 +53,7 @@ export class ResponseGenerator {
         this.ipfsClient = new IpfsClient(config.ipfs);
 
         // Calculate node ID from worker address
-        this.nodeId = ethers.keccak256(ethers.toUtf8Bytes(this.config.node.worker));
+        this.nodeId = namespaceToId(`node.${this.config.node.username}.${this.config.node.nodeName}`);
     }
 
     async generateResponse(requestId: string, request: RouterRequest) {
@@ -58,11 +65,23 @@ export class ResponseGenerator {
 
         try {
             // 1. Send the request to the AI client
-            console.log(`Processing request ${requestId} for model ${request.modelId}`);
+            this.logger.debug(`Processing request ${requestId} for model ${request.modelId}`);
+            
+            let parsedRequest: AiRequest|undefined;
+            try { 
+                parsedRequest = await this.requestParser.parseRouterRequest(requestId, request);
+            } catch (error) {
+                if ((error as any) instanceof AbiDecodeError) {
+                    this.logger.debug(`Abi decode error for request ${requestId}:`, (error as AbiDecodeError).message);
+                    await this.recordErrorResponse(requestId, (error as AbiDecodeError).message, request);
+                    return;
+                } else {
+                    throw error;
+                }
+            }
             
             // Send request to AI client
-            const aiResponse = await aiClient.request(
-                await this.requestParser.parseRouterRequest(requestId, request));
+            const aiResponse = await aiClient.request(parsedRequest!);
             
             if (aiResponse.error) {
                 console.info(`AI client error for request ${requestId}:`, aiResponse.error);
@@ -103,7 +122,7 @@ export class ResponseGenerator {
 
         } catch (error) {
             console.error(`Error processing request ${requestId}:`, error);
-            await this.recordErrorResponse(requestId, error instanceof Error ? error.message : "Unknown error", request);
+            throw error;
         }
     }
 
@@ -213,12 +232,24 @@ export class ResponseGenerator {
     private async recordErrorResponse(
         requestId: string,
         errorMessage: string,
-        request: RouterRequest
+        request: RouterRequest,
+        aiProcessed: boolean,
     ): Promise<void> {
         if (!this.routerContract || !this.nodeId) {
             throw new Error("Router contract or node ID not initialized");
         }
 
+        // Sanitize and truncate error message for contract
+        let safeMessage = errorMessage;
+        if (typeof safeMessage !== 'string') {
+            safeMessage = String(safeMessage);
+        }
+        // Only keep the first 100 characters (adjust as needed for your contract)
+        if (safeMessage.length > 100) {
+            safeMessage = safeMessage.slice(0, 97) + '...';
+        }
+
+        this.logger.debug(`Recording error response for request ${requestId}: ${safeMessage}`);
         try {
             const requestSize = BigInt(request.request.call.length / 2);
             const responseSize = BigInt(0); // No response for error
@@ -226,10 +257,10 @@ export class ResponseGenerator {
             const txResponse = await this.routerContract.respondToRequest(
                 requestId,
                 2, // ResponseStatus.FAILURE
-                errorMessage,
-                "", // Empty response for failure
+                safeMessage,
+                "0x", // Empty response for failure
                 this.nodeId,
-                requestSize,
+                aiProcessed ? requestSize : BigInt(0),
                 responseSize
             );
 
