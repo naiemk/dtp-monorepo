@@ -18,7 +18,7 @@ abstract contract WithDtnAiUpgradeable is Initializable {
     bytes32 private constant WithDtnAiStorageLocation =
         0x120a853abbe723116a3ebafd26371681971b14dbea103ee376d65bbb8d134e00;
 
-    function getWithDtnAiStorage() internal view returns (WithDtnAiStorage storage $) {
+    function getWithDtnAiStorage() internal pure returns (WithDtnAiStorage storage $) {
         assembly {
             $.slot := WithDtnAiStorageLocation
         }

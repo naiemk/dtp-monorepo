@@ -62,10 +62,6 @@ contract RouterUpgradeable is
     bytes32 private constant RouterStorageV001Location =
         0xd9df4050ae7b51269371916df4148c5d25559acd8ad82e2b2cc4c87cd91c7e00;
 
-    // Errors
-    error SuccessCallbackFailed(bytes data);
-    error FailureCallbackFailed(bytes data);
-
     // Events
     event RequestCreated(
         bytes32 indexed requestId,
@@ -74,6 +70,8 @@ contract RouterUpgradeable is
     );
     event RequestCompleted(bytes32 indexed requestId, ResponseStatus status);
     event ResponseReceived(bytes32 indexed requestId, bytes32 indexed nodeId, ResponseStatus status);
+    event SuccessCallbackFailed(bytes32 indexed requestId, bytes data);
+    event FailureCallbackFailed(bytes32 indexed requestId, bytes data);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -306,12 +304,12 @@ contract RouterUpgradeable is
             );
             console.log("Success callback");
             console.logBytes(data);
-            if (!success) revert SuccessCallbackFailed(data);
+            if (!success) emit SuccessCallbackFailed(requestId, data);
         } else { // Failure
             (bool success, bytes memory data) = requestData.callback.target.call{gas: requestData.callbackGas}(
                 abi.encodeWithSelector(requestData.callback.failure, requestId)
             );
-            if (!success) revert FailureCallbackFailed(data);
+            if (!success) emit FailureCallbackFailed(requestId, data);
         }
 
         emit RequestCompleted(requestId, status);

@@ -30,15 +30,18 @@ contract CallAiExample is WithDtnAi {
             sessionId = ai.startUserSession();
         }
 
-        bytes32[] memory nodes = new bytes32[](1);
-        nodes[0] = keccak256(abi.encodePacked(node)); // Allow custom nodes to respond
+        string[] memory prompt_lines = new string[](2);
+        prompt_lines[0] = "text {0:uint8} and {1:address}";
+        prompt_lines[1] = prompt;
+        bytes memory extraParams = abi.encode(12, address(this)); // These are the extra parmeters to the prompt's line[0]
+
         requestId = ai.request{value: msg.value}(
             sessionId,
             keccak256(abi.encodePacked(model)), // the model ID
-            DtnDefaults.defaultCustomNodesValidatedAny(nodes),
+            DtnDefaults.defaultCustomNodesValidatedAny(DtnDefaults.singleArray(keccak256(abi.encodePacked(node)))),
             IDtnAi.DtnRequest({
-                call: abi.encode(["text {0:uint8} and {1:address}", prompt]),
-                extraParams: abi.encode(12, address(this)),
+                call: abi.encode(prompt_lines),
+                extraParams: extraParams,
                 calltype: IDtnAi.CallType.DIRECT, 
                 feePerByteReq: 0.001 * 10**18,
                 feePerByteRes: 0.001 * 10**18,

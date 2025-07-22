@@ -29,5 +29,17 @@ library DtnDefaults {
         });
     }
 
+    function singleArray(bytes32 value) internal pure returns (bytes32[] memory) {
+        bytes32[] memory array = new bytes32[](1);
+        array[0] = value;
+        return array;
+    }
+
+    function singleArray(string memory value) internal pure returns (bytes32[] memory) {
+        bytes32[] memory array = new bytes32[](1);
+        array[0] = keccak256(abi.encode(value));
+        return array;
+    }
+
     uint256 public constant ROUTING_SYSTEM_VALIDATED_ANY_CONSTANT = 1;
 }

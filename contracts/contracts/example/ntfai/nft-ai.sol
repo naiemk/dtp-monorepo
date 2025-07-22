@@ -238,7 +238,7 @@ contract NftAi is
         emit NFTMinted(to, tokenId, prompt, imageUri);
     }
 
-    function generateAIContent(string memory prompt) internal returns (string memory) {
+    function generateAIContent(string memory prompt) internal pure returns (string memory) {
         // This function would integrate with your AI service
         // For now, return a placeholder URI
         // In a real implementation, this would call an oracle or external service

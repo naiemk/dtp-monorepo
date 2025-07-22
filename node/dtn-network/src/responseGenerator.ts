@@ -73,7 +73,7 @@ export class ResponseGenerator {
             } catch (error) {
                 if ((error as any) instanceof AbiDecodeError) {
                     this.logger.debug(`Abi decode error for request ${requestId}:`, (error as AbiDecodeError).message);
-                    await this.recordErrorResponse(requestId, (error as AbiDecodeError).message, request);
+                    await this.recordErrorResponse(requestId, (error as AbiDecodeError).message, request, false);
                     return;
                 } else {
                     throw error;
@@ -85,7 +85,7 @@ export class ResponseGenerator {
             
             if (aiResponse.error) {
                 console.info(`AI client error for request ${requestId}:`, aiResponse.error);
-                await this.recordErrorResponse(requestId, aiResponse.error, request);
+                await this.recordErrorResponse(requestId, aiResponse.error, request, true);
                 return;
             }
 

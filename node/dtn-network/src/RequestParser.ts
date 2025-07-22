@@ -60,9 +60,6 @@ export class RequestParser {
         const call = request.request.call;
         const extraParams = request.request.extraParams;
 
-        console.log('Decoding call', call);
-        console.log('Decoding extra params', extraParams); 
-        console.log('parameter types', apiParameterTypes);
         let modelParams;
         try {
             // Decode the main call parameters

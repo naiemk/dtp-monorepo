@@ -12,7 +12,7 @@ const LockModule = buildModule("DeployCallAi", (m) => {
   const dtn_ai = m.getParameter("dtn_ai", DTN_AI);
 
   // Deploy NamespaceManager, init with owner
-  const dtnAi = m.contract("CallAiExample", [dtn_ai], { id: "callAiExample_0" });
+  const dtnAi = m.contract("CallAiExample", [dtn_ai], { id: "callAiExample_2" });
   return { dtnAi };
 });
 
