@@ -1,8 +1,7 @@
-import axios from 'axios';
+import { PinataSDK } from 'pinata';
 
 export interface PinataConfig {
-    apiKey: string;
-    secretKey: string;
+    pinataJwt?: string;
     gateway?: string;
 }
 
@@ -13,100 +12,71 @@ export interface StoreOptions {
 }
 
 export class IpfsClient {
+    private pinata: InstanceType<typeof PinataSDK>;
     private config: PinataConfig;
-    private baseUrl = 'https://api.pinata.cloud';
 
-    constructor(config: PinataConfig) {
+    constructor(_config: PinataConfig, private nodeId: string) {
         this.config = {
-            ...config,
-            gateway: config.gateway || 'https://gateway.pinata.cloud'
+            pinataJwt: process.env[_config.pinataJwt!],
+            gateway: 'https://gateway.pinata.cloud'
         };
+        // Prefer JWT if provided, else fallback to API/Secret
+        if (!this.config.pinataJwt) {
+            throw new Error('Pinata config must include pinataJwt');
+        }
+        this.pinata = new PinataSDK({
+            pinataJwt: this.config.pinataJwt,
+            pinataGateway: this.config.gateway
+        });
     }
 
     /**
-     * Store string data on IPFS
-     */
-    async store(data: string, options?: StoreOptions): Promise<string>;
-    
-    /**
-     * Store binary data on IPFS
-     */
-    async store(data: Buffer | Uint8Array, options?: StoreOptions): Promise<string>;
-    
-    /**
-     * Store data on IPFS (implementation)
+     * Store string or binary data on IPFS
      */
     async store(data: string | Buffer | Uint8Array, options: StoreOptions = {}): Promise<string> {
-        try {
-            let dataBuffer: Buffer;
-            let filename: string;
-            let contentType: string;
-
-            // Handle different input types
-            if (typeof data === 'string') {
-                dataBuffer = Buffer.from(data, 'utf-8');
-                filename = options.filename || 'data.json';
-                contentType = options.contentType || 'application/json';
-            } else if (data instanceof Buffer) {
-                dataBuffer = data;
-                filename = options.filename || 'data.bin';
-                contentType = options.contentType || 'application/octet-stream';
-            } else if (data instanceof Uint8Array) {
-                dataBuffer = Buffer.from(data);
-                filename = options.filename || 'data.bin';
-                contentType = options.contentType || 'application/octet-stream';
-            } else {
-                throw new Error('Unsupported data type. Must be string, Buffer, or Uint8Array');
-            }
-            
-            // Create form data for Pinata API
-            const formData = new FormData();
-            formData.append('file', new Blob([dataBuffer], { type: contentType }), filename);
-            
-            // Add metadata
-            const metadata = {
-                name: options.filename || `dtn-data-${Date.now()}`,
-                keyvalues: {
-                    source: 'dtn-network',
-                    timestamp: new Date().toISOString(),
-                    contentType: contentType,
-                    size: dataBuffer.length,
-                    ...options.metadata
-                }
-            };
-            formData.append('pinataMetadata', JSON.stringify(metadata));
-            
-            // Upload to Pinata
-            const response = await axios.post(`${this.baseUrl}/pinning/pinFileToIPFS`, formData, {
-                headers: {
-                    'Authorization': `Bearer ${this.config.apiKey}`,
-                    'Content-Type': 'multipart/form-data'
-                }
-            });
-            
-            // Return the IPFS hash (CID)
-            return response.data.IpfsHash;
-        } catch (error) {
-            console.error('Error storing data on IPFS via Pinata:', error);
-            throw new Error(`Failed to store data on IPFS: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        let file: File;
+        let filename: string;
+        let contentType: string;
+        if (typeof data === 'string') {
+            filename = options.filename || 'data.json';
+            contentType = options.contentType || 'application/json';
+            file = new File([data], filename, { type: contentType });
+        } else if (data instanceof Buffer || data instanceof Uint8Array) {
+            filename = options.filename || 'data.bin';
+            contentType = options.contentType || 'application/octet-stream';
+            file = new File([data], filename, { type: contentType });
+        } else {
+            throw new Error('Unsupported data type. Must be string, Buffer, or Uint8Array');
         }
+        // Metadata: keyvalues must be Record<string, string>
+        const keyvalues: Record<string, string> = {
+            source: 'dtn-network',
+            nodeId: String(this.nodeId),
+            timestamp: new Date().toISOString(),
+            contentType: contentType,
+            size: String((typeof data === 'string') ? Buffer.byteLength(data, 'utf-8') : (data as Buffer | Uint8Array).length),
+            ...Object.fromEntries(Object.entries(options.metadata || {}).map(([k, v]) => [k, String(v)]))
+        };
+        const metadata = {
+            name: options.filename || `dtn-data-${Date.now()}`,
+            keyvalues
+        };
+        // Upload using Pinata SDK
+        const upload = await this.pinata.upload.public.file(file, { metadata });
+        return upload.cid;
     }
 
     /**
      * Retrieve data from IPFS as string
      */
     async retrieve(cid: string): Promise<string> {
-        try {
-            // Retrieve data from Pinata gateway
-            const response = await axios.get(`${this.config.gateway}/ipfs/${cid}`, {
-                responseType: 'arraybuffer'
-            });
-            
-            // Convert buffer to string
-            return Buffer.from(response.data).toString('utf-8');
-        } catch (error) {
-            console.error('Error retrieving data from IPFS via Pinata:', error);
-            throw new Error(`Failed to retrieve data from IPFS: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        const response = await this.pinata.gateways.public.get(cid);
+        if (typeof response.data === 'string') {
+            return response.data;
+        } else if (response.data instanceof Blob) {
+            return await response.data.text();
+        } else {
+            throw new Error('Unknown response data type');
         }
     }
 
@@ -114,17 +84,14 @@ export class IpfsClient {
      * Retrieve data from IPFS as binary buffer
      */
     async retrieveBinary(cid: string): Promise<Buffer> {
-        try {
-            // Retrieve data from Pinata gateway
-            const response = await axios.get(`${this.config.gateway}/ipfs/${cid}`, {
-                responseType: 'arraybuffer'
-            });
-            
-            // Return as buffer
-            return Buffer.from(response.data);
-        } catch (error) {
-            console.error('Error retrieving binary data from IPFS via Pinata:', error);
-            throw new Error(`Failed to retrieve binary data from IPFS: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        const response = await this.pinata.gateways.public.get(cid);
+        if (typeof response.data === 'string') {
+            return Buffer.from(response.data, 'utf-8');
+        } else if (response.data instanceof Blob) {
+            const arrayBuffer = await response.data.arrayBuffer();
+            return Buffer.from(arrayBuffer);
+        } else {
+            throw new Error('Unknown response data type');
         }
     }
 
@@ -132,19 +99,13 @@ export class IpfsClient {
      * Store a file from the local filesystem
      */
     async storeFile(filePath: string, options?: StoreOptions): Promise<string> {
-        try {
-            const fs = await import('fs/promises');
-            const dataBuffer = await fs.readFile(filePath);
-            const filename = options?.filename || filePath.split('/').pop() || 'file';
-            
-            return this.store(dataBuffer, {
-                ...options,
-                filename
-            });
-        } catch (error) {
-            console.error('Error storing file on IPFS:', error);
-            throw new Error(`Failed to store file on IPFS: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+        const fs = await import('fs/promises');
+        const dataBuffer = await fs.readFile(filePath);
+        const filename = options?.filename || filePath.split('/').pop() || 'file';
+        return this.store(dataBuffer, {
+            ...options,
+            filename
+        });
     }
 
     /**
@@ -176,12 +137,7 @@ export class IpfsClient {
      */
     async isConnected(): Promise<boolean> {
         try {
-            // Test connection by getting user data from Pinata
-            await axios.get(`${this.baseUrl}/data/testAuthentication`, {
-                headers: {
-                    'Authorization': `Bearer ${this.config.apiKey}`
-                }
-            });
+            await this.pinata.gateways.public.get('bafkreigh2akiscaildc6wq6j5g6z2w5v6z3v6z3v6z3v6z3v6z3v6z3v6z3');
             return true;
         } catch (error) {
             console.error('IPFS client not connected:', error);
@@ -193,31 +149,7 @@ export class IpfsClient {
      * Get information about a CID without downloading the content
      */
     async getCidInfo(cid: string): Promise<any> {
-        try {
-            // Get metadata from Pinata
-            const response = await axios.get(`${this.baseUrl}/pinning/pinList?hashContains=${cid}`, {
-                headers: {
-                    'Authorization': `Bearer ${this.config.apiKey}`
-                }
-            });
-            
-            const pin = response.data.rows.find((p: any) => p.ipfs_pin_hash === cid);
-            if (!pin) {
-                throw new Error('CID not found in Pinata');
-            }
-            
-            return {
-                cid: pin.ipfs_pin_hash,
-                size: pin.size,
-                name: pin.metadata?.name,
-                timestamp: pin.date_pinned,
-                type: 'file',
-                metadata: pin.metadata?.keyvalues
-            };
-        } catch (error) {
-            console.error('Error getting CID info:', error);
-            throw new Error(`Failed to get CID info: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
+        return { cid, gatewayUrl: this.getGatewayUrl(cid) };
     }
 
     /**
@@ -225,11 +157,7 @@ export class IpfsClient {
      */
     async unpin(cid: string): Promise<boolean> {
         try {
-            await axios.delete(`${this.baseUrl}/pinning/unpin/${cid}`, {
-                headers: {
-                    'Authorization': `Bearer ${this.config.apiKey}`
-                }
-            });
+            await this.pinata.keys.revoke([cid]);
             return true;
         } catch (error) {
             console.error('Error unpinning CID:', error);

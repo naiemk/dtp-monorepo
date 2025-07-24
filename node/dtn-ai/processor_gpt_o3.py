@@ -69,15 +69,19 @@ def _handle_text_generation(parameters: List[Any], types: List[str]) -> Tuple[st
     """
     if len(parameters) < 1:
         raise ApiError("Text generation requires at least 1 parameter (prompt)", "INVALID_PARAMETERS")
+    parameter = parameters[0] # The only parameter which can be string[] or string
+
+    if len(types) < 1 or (types[0] != "string" and types[0] != "string[]"):
+        raise ApiError("First parameter must be a string or string[] (prompt)", "INVALID_PARAMETERS")
     
-    if len(types) < 1 or types[0] != "string":
-        raise ApiError("First parameter must be a string (prompt)", "INVALID_PARAMETERS")
-    
-    prompt = parameters.join("\n") if types[0] == "string[]" else parameters[0]
-    
+    if isinstance(parameter, list):
+        prompt = "\n".join(parameter)
+    else:
+        prompt = parameter[0]
+    logger.info(f"Prompt: \n====== \n{prompt}\n======")
+
     try:
         client = _get_openai_client()
-        
         # Use GPT-4o for text generation (latest model)
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -114,13 +118,20 @@ def _handle_image_generation(parameters: List[Any], types: List[str]) -> Tuple[s
     """
     if len(parameters) < 1:
         raise ApiError("Image generation requires at least 1 parameter (prompt)", "INVALID_PARAMETERS")
-    if len(types) < 1 or types[0] != "string":
-        raise ApiError("First parameter must be a string (prompt)", "INVALID_PARAMETERS")
+    parameter = parameters[0] # The only parameter which can be string[] or string
+
+    if len(types) < 1 or (types[0] != "string" and types[0] != "string[]"):
+        raise ApiError("First parameter must be a string or string[] (prompt)", "INVALID_PARAMETERS")
     
-    prompt = parameters.join("\n") if types[0] == "string[]" else parameters[0]
+    if isinstance(parameter, list):
+        prompt = "\n".join(parameter)
+    else:
+        prompt = parameter[0]
+    logger.info(f"Prompt: \n====== \n{prompt}\n======")
 
     try:
         client = _get_openai_client()
+        # size = f"{parameters[1]}x{parameters[2]}" if len(parameters) >= 3 else "1024x1024"
         size = "1024x1024"
 
         # Use GPT-4o multimodal image generation

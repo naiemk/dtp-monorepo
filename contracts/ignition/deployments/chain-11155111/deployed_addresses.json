@@ -21,5 +21,10 @@
   "UpgradeRouter#newRouter": "0xDd4278C19440D0468b03ED1a6c55998692d916dF",
   "UpgradeRouter#existingRouter_1": "0x1BC1062B3cCDe51b7727098B0488Fd71c9f784B2",
   "UpgradeRouter#newRouter_1": "0xB204952d96403C1B2fFCe752337554b30395dF1E",
-  "DeployCallAi#callAiExample_2": "0x7f1cF4c426Ec57Cb2BB15bf0AFcfC86B47E65dCA"
+  "DeployCallAi#callAiExample_2": "0x7f1cF4c426Ec57Cb2BB15bf0AFcfC86B47E65dCA",
+  "DeployCallAi#callAiExample_3": "0x1b671156c2AEd56478484766DAcbaF638E713532",
+  "DeployCallAi#callAiExample_4": "0xAB22E3EC0cfb5C3Fb332a9E89323511621bB1e49",
+  "DeployCallAi#callAiExample_5": "0x92E6Ef94ab5Ca9fB682388A9fAf43089f4Aea3e7",
+  "UpgradeRouter#existingRouter_2": "0x1BC1062B3cCDe51b7727098B0488Fd71c9f784B2",
+  "UpgradeRouter#newRouter_2": "0x2a44175bf1c325Dc9796Dd6D29415dcc1A90A59b"
 }

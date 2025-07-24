@@ -94,7 +94,7 @@ contract SessionManagerUpgradeable is Initializable, MultiOwnerBase, ISessionMan
         
         if (remainingBalance > 0) {
             SessionManagerStorageV001 storage $ = _getStorage();
-            sendToken($.feeToken, msg.sender, remainingBalance);
+            sendToken($.feeToken, owner, remainingBalance);
         }
     }
 

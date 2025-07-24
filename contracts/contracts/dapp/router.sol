@@ -355,8 +355,10 @@ contract RouterUpgradeable is
         // Calculate response fee using response-specific rate
         uint256 responseFee = responseSize * requestData.request.feePerByteRes;
         
-        // Ensure response fee doesn't exceed maximum allowed
-        require(responseFee <= requestData.request.totalFeePerRes, "Response fee exceeds maximum");
+        // Ensure response fee doesn't exceed maximum allowed. Override the max so that the node can't charge more than the user.
+        if (responseFee > requestData.request.totalFeePerRes) {
+            responseFee = requestData.request.totalFeePerRes;
+        }
 
         // Charge the session for both request and response fees
         uint256 totalFee = requestFee + responseFee;

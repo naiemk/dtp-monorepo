@@ -9,9 +9,11 @@ import json
 import logging
 import os
 import sys
-from typing import Dict, Any, Tuple, Optional
-from aiohttp import web, ClientSession
+from typing import Dict, Any, Optional
+from aiohttp import web
 import yaml
+from dotenv import load_dotenv
+load_dotenv()
 
 # Import the ApiError from processor module
 try:
@@ -100,10 +102,12 @@ class DTNAIServer:
             parameters = call_data['parameters']
             types = call_data['types']
             
-            logger.info(f"Processing request {request_id} for model {model_name}")
+            logger.info(f"Processing request \"{request_id}\" for model \"{model_name}\"")
+            logger.info(f"Call data: {call_data}, types: {types}")
             
             # Check if model is supported
             if model_name not in self.processors:
+                logger.warning(f"Model {model_name} not supported (asked by requestId: {request_id})")
                 return web.json_response({
                     'requestId': request_id,
                     'data': '',

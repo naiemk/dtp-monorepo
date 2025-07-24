@@ -6,25 +6,24 @@ import type { RequestParser } from "./RequestParser";
 import { AbiDecodeError } from "./RequestParser";
 import { AbiCoder } from "ethers";
 import { Logger, LogLevel } from "./logger";
+import { parseBinaryData, sendWithGasEstimate } from "./EthersUtils";
 
-// Router contract interface for responding to requests
-interface RouterContract {
-    respondToRequest(
-        requestId: string,
-        status: number,
-        message: string,
-        response: string,
-        nodeId: string,
-        requestSize: bigint,
-        responseSize: bigint
-    ): Promise<ethers.ContractTransactionResponse>;
-}
+type RespondToRequestParams = [
+    requestId: string,
+    status: number,
+    message: string,
+    response: string,
+    nodeId: string,
+    requestSize: bigint,
+    responseSize: bigint,
+]
 
 export class ResponseGenerator {
     private provider: ethers.JsonRpcProvider | undefined;
     private wallet: ethers.Wallet | undefined;
-    private routerContract: RouterContract | undefined;
+    private routerContract: ethers.Contract | undefined;
     private nodeId: string | undefined;
+    private models: Map<string, string> | undefined;
     private ipfsClient: IpfsClient | undefined;
     private logger: Logger;
 
@@ -41,19 +40,21 @@ export class ResponseGenerator {
         this.logger.info(`ResponseGenerator: Using worker address ${this.wallet?.address}`);
 
         // Initialize router contract
-        this.routerContract = new ethers.Contract(
+        const contractRaw = new ethers.Contract(
             config.network.routerAddress,
             [
                 "function respondToRequest(bytes32 requestId, uint8 status, string message, bytes response, bytes32 nodeId, uint256 requestSize, uint256 responseSize) external"
             ],
             this.wallet
-        ) as unknown as RouterContract;
+        );
+        this.routerContract = contractRaw; 
 
+        this.nodeId = namespaceToId(`node.${this.config.node.username}.${this.config.node.nodeName}`);
         // Initialize IPFS client
-        this.ipfsClient = new IpfsClient(config.ipfs);
+        this.ipfsClient = new IpfsClient(config.ipfs, this.nodeId);
 
         // Calculate node ID from worker address
-        this.nodeId = namespaceToId(`node.${this.config.node.username}.${this.config.node.nodeName}`);
+        this.models = new Map(this.config.node.models.map(m => [namespaceToId(m.name), m.name]));
     }
 
     async generateResponse(requestId: string, request: RouterRequest) {
@@ -67,7 +68,7 @@ export class ResponseGenerator {
             // 1. Send the request to the AI client
             this.logger.debug(`Processing request ${requestId} for model ${request.modelId}`);
             
-            let parsedRequest: AiRequest|undefined;
+            let parsedRequest: Partial<AiRequest>|undefined;
             try { 
                 parsedRequest = await this.requestParser.parseRouterRequest(requestId, request);
             } catch (error) {
@@ -81,7 +82,11 @@ export class ResponseGenerator {
             }
             
             // Send request to AI client
-            const aiResponse = await aiClient.request(parsedRequest!);
+            const aiResponse = await aiClient.request({
+                requestId: requestId,
+                model: this.modelLookup(request.modelId),
+                call: parsedRequest!.call!
+            });
             
             if (aiResponse.error) {
                 console.info(`AI client error for request ${requestId}:`, aiResponse.error);
@@ -94,10 +99,12 @@ export class ResponseGenerator {
             let responseSize: bigint;
 
             const responseType = this.requestParser.getApiResponseType(request.modelId);
-            if (request.request.calltype === 0) { // IPFS
+            const isIPFS = request.request.calltype === BigInt(0);
+            if (isIPFS) { // IPFS
                 // Get the response type (bytes / string)
                 // Store response on IPFS and get CID
-                const ipfsCid = await this.storeOnIPFS(aiResponse.data, requestId, responseType);
+                const data = responseType === 'bytes' ? parseBinaryData(aiResponse.data) : aiResponse.data;
+                const ipfsCid = await this.storeOnIPFS(data, requestId);
                 finalResponse = ipfsCid;
                 responseSize = BigInt(aiResponse.data.length);
             } else { // DIRECT
@@ -115,7 +122,7 @@ export class ResponseGenerator {
                 finalResponse,
                 requestSize,
                 responseSize,
-                responseType
+                isIPFS ? "string" : responseType
             );
 
             console.log(`Successfully processed request ${requestId}`);
@@ -126,23 +133,17 @@ export class ResponseGenerator {
         }
     }
 
-    private async storeOnIPFS(data: string | Buffer | Uint8Array | object, requestId: string, responseType: string): Promise<string> {
-        if (responseType !== "bytes" && responseType !== "string") {
-            throw new Error("Invalid response type (only bytes or string are supported for IPFS)");
-        }
-
+    private async storeOnIPFS(data: string | Buffer, requestId: string): Promise<string> {
         if (!this.ipfsClient) {
             throw new Error("IPFS client not initialized");
         }
         
         try {
-            console.log(`Storing data on IPFS for request ${requestId}...`);
-            
             let cid: string;
-            
             // Handle different data types
             if (typeof data === 'string') {
                 // Store as JSON string
+                console.log(`Storing data as JSON string for request ${requestId}`);
                 cid = await this.ipfsClient.storeJson(data, {
                     filename: `response-${requestId}.json`,
                     metadata: {
@@ -153,8 +154,9 @@ export class ResponseGenerator {
                 });
             } else if (data instanceof Buffer || data instanceof Uint8Array) {
                 // Store as binary data
+                console.log(`Storing data as binary data for request ${requestId}`);
                 cid = await this.ipfsClient.store(data, {
-                    filename: `response-${requestId}.bin`,
+                    filename: `response-${requestId}`,
                     contentType: 'application/octet-stream',
                     metadata: {
                         requestId,
@@ -163,29 +165,9 @@ export class ResponseGenerator {
                         timestamp: new Date().toISOString()
                     }
                 });
-            } else if (typeof data === 'object') {
-                // Store as JSON object
-                cid = await this.ipfsClient.storeJson(data, {
-                    filename: `response-${requestId}.json`,
-                    metadata: {
-                        requestId,
-                        dataType: 'object',
-                        timestamp: new Date().toISOString()
-                    }
-                });
             } else {
-                // Convert to string and store
-                cid = await this.ipfsClient.store(String(data), {
-                    filename: `response-${requestId}.txt`,
-                    contentType: 'text/plain',
-                    metadata: {
-                        requestId,
-                        dataType: 'text',
-                        timestamp: new Date().toISOString()
-                    }
-                });
+                throw new Error(`Invalid data type: ${typeof data}`);
             }
-            
             console.log(`Data stored on IPFS with CID: ${cid} for request ${requestId}`);
             return cid;
         } catch (error) {
@@ -210,7 +192,10 @@ export class ResponseGenerator {
         );
 
         try {
-            const txResponse = await this.routerContract.respondToRequest(
+            const txResponse = await sendWithGasEstimate<RespondToRequestParams>(
+                this.routerContract,
+                "respondToRequest",
+                [
                 requestId,
                 1, // ResponseStatus.SUCCESS
                 "", // Empty message for success
@@ -218,8 +203,8 @@ export class ResponseGenerator {
                 this.nodeId,
                 requestSize,
                 responseSize
+                ]
             );
-
             console.log(`Recording success response for request ${requestId}, tx: ${txResponse.hash}`);
             const receipt = await txResponse.wait();
             console.log(`Success response recorded for request ${requestId}, gas used: ${receipt?.gasUsed}`);
@@ -254,7 +239,10 @@ export class ResponseGenerator {
             const requestSize = BigInt(request.request.call.length / 2);
             const responseSize = BigInt(0); // No response for error
 
-            const txResponse = await this.routerContract.respondToRequest(
+            const txResponse = await sendWithGasEstimate<RespondToRequestParams>(
+                this.routerContract,
+                "respondToRequest",
+                [
                 requestId,
                 2, // ResponseStatus.FAILURE
                 safeMessage,
@@ -262,8 +250,8 @@ export class ResponseGenerator {
                 this.nodeId,
                 aiProcessed ? requestSize : BigInt(0),
                 responseSize
+                ]
             );
-
             console.log(`Recording error response for request ${requestId}, tx: ${txResponse.hash}`);
             const receipt = await txResponse.wait();
             console.log(`Error response recorded for request ${requestId}, gas used: ${receipt?.gasUsed}`);
@@ -271,5 +259,13 @@ export class ResponseGenerator {
             console.error(`Failed to record error response for request ${requestId}:`, error);
             throw error;
         }
+    }
+
+    private modelLookup(modelId: string): string {
+        const model = this.models?.get(modelId);
+        if (!model) {
+            throw new Error(`Model ${modelId} not found in config`);
+        }
+        return model;
     }
 }

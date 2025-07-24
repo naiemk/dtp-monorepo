@@ -83,7 +83,7 @@ describe("Run and end-to-end call ai and print result", function () {
       const ctx = await deployRouter();
 
       console.log(`Owner: ${ctx.owner.address}, Router: ${ctx.router.target} token: ${ctx.token.target}`);
-      await ctx.token.approve(ctx.callAi.target, ethers.parseEther("100"));
+      await ctx.token.transfer(ctx.callAi.target, ethers.parseEther("100"));
 
       console.log("NS MGR", await ctx.modelManager.getNamespaceManager());
       console.log("NS MGR", await ctx.modelManager.getRouter());
@@ -107,7 +107,7 @@ describe("Run and end-to-end call ai and print result", function () {
       const nodeId = ethers.solidityPackedKeccak256(['string'], ['node.tester.node1']);
       await ctx.nodeManager.setNodeModels(nodeId, [ethers.solidityPackedKeccak256(['string'], ['model.system.openai-gpt-4'])]);
 
-      await ctx.token.approve(ctx.callAi.target, ethers.parseEther("100"));
+      await ctx.token.transfer(ctx.callAi.target, ethers.parseEther("100"));
       await ctx.callAi.doCallAi("What is A+B, if A=10 and B=12. Write only one single number as response.",
         "node.tester.node1",
         "model.system.openai-gpt-4",
@@ -137,7 +137,7 @@ describe("Run and end-to-end call ai and print result", function () {
       const nodeId = ethers.solidityPackedKeccak256(['string'], ['node.tester.node1']);
       await ctx.nodeManager.setNodeModels(nodeId, [ethers.solidityPackedKeccak256(['string'], ['model.system.openai-gpt-4'])]);
 
-      await ctx.token.approve(ctx.callAi.target, ethers.parseEther("100"));
+      await ctx.token.transfer(ctx.callAi.target, ethers.parseEther("100"));
       await ctx.callAi.doCallAi("What is A+B, if A=10 and B=12. Write only one single number as response.",
         "node.tester.node1",
         "model.system.openai-gpt-4",
@@ -154,6 +154,10 @@ describe("Run and end-to-end call ai and print result", function () {
 
       const error = await ctx.callAi.error();
       expect(error).to.equal('ER101: Node errored');
-    });
 
+      console.log("Also test restart session");
+      const sessionId = await ctx.callAi.sessionId();
+      await ctx.callAi.restartSession(); // We will have enough tokens refunded. No need to transfer more tokens.
+      expect(await ctx.callAi.sessionId()).to.not.equal(sessionId);
+    });
 }); 

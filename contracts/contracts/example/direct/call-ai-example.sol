@@ -9,7 +9,7 @@ import "hardhat/console.sol";
 
 contract CallAiExample is WithDtnAi {
     using SafeERC20 for IERC20;
-    event Request(bytes32 requestId, string prompt);
+    event Request(bytes32 requestId, string[] prompt_lines, bytes extraParams);
     event Result(bytes32 requestId, IDtnAi.ResponseStatus status, string message, string result);
     event Error(bytes32 requestId);
 
@@ -17,31 +17,31 @@ contract CallAiExample is WithDtnAi {
     string public error;
     uint256 public sessionId;
     bytes32 public requestId;
+    string public ipfsCid;
     
     constructor(address ai) {
         setAi(ai);
     }
 
     function doCallAi(string memory prompt, string memory node, string memory model) public payable {
-        if (sessionId == 0) {
-            uint amount = 1*10**18;
-            IERC20( ai.feeToken() ).safeTransferFrom(
-            msg.sender, ai.feeTarget(), amount);
-            sessionId = ai.startUserSession();
-        }
-
         string[] memory prompt_lines = new string[](2);
-        prompt_lines[0] = "text {0:uint8} and {1:address}";
+        prompt_lines[0] = "This is metadata - {0:uint8} and {1:address} -. Ignore the metadata and answer the next question:";
         prompt_lines[1] = prompt;
-        bytes memory extraParams = abi.encode(12, address(this)); // These are the extra parmeters to the prompt's line[0]
+        bytes memory extraParams = abi.encode(26, address(this)); // These are the extra parmeters to the prompt's line[0]
+        doCallAiDetailed(prompt_lines, extraParams, node, model);
+    }
 
+    function doCallAiDetailed(string[] memory prompt_lines, bytes memory extraParamsEncoded, string memory node, string memory model) public payable {
+        if (sessionId == 0) {
+            restartSession();
+        }
         requestId = ai.request{value: msg.value}(
             sessionId,
             keccak256(abi.encodePacked(model)), // the model ID
             DtnDefaults.defaultCustomNodesValidatedAny(DtnDefaults.singleArray(keccak256(abi.encodePacked(node)))),
             IDtnAi.DtnRequest({
                 call: abi.encode(prompt_lines),
-                extraParams: extraParams,
+                extraParams: extraParamsEncoded,
                 calltype: IDtnAi.CallType.DIRECT, 
                 feePerByteReq: 0.001 * 10**18,
                 feePerByteRes: 0.001 * 10**18,
@@ -55,13 +55,58 @@ contract CallAiExample is WithDtnAi {
             msg.sender, 
             msg.value
         );
-        emit Request(requestId, prompt);
+        emit Request(requestId, prompt_lines, extraParamsEncoded);
+    }
+
+    function doCallAiImage(
+        string[] memory prompt_lines, bytes memory extraParamsEncoded, string memory node, string memory model, uint64 width, uint64 height
+        ) public payable {
+        if (sessionId == 0) {
+            restartSession();
+        }
+        requestId = ai.request{value: msg.value}(
+            sessionId,
+            keccak256(abi.encodePacked(model)), // the model ID
+            DtnDefaults.defaultCustomNodesValidatedAny(DtnDefaults.singleArray(keccak256(abi.encodePacked(node)))),
+            IDtnAi.DtnRequest({
+                call: abi.encode(prompt_lines, width, height),
+                extraParams: extraParamsEncoded,
+                calltype: IDtnAi.CallType.IPFS, 
+                feePerByteReq: 0.001 * 10**18,
+                feePerByteRes: 0.001 * 10**18,
+                totalFeePerRes: 1 * 10**18
+            }),
+            IDtnAi.CallBack(
+                this.callbackIpfs.selector,
+                this.aiError.selector,
+                address(this)
+            ),
+            msg.sender, 
+            msg.value
+        );
+        emit Request(requestId, prompt_lines, extraParamsEncoded);
+    }
+
+    function restartSession() public {
+        if (sessionId != 0) {
+            ai.closeUserSession(sessionId);
+        }
+        uint amount = IERC20(ai.feeToken()).balanceOf(address(this)); // Use what we have to start a session
+        require(amount > 0, "Not enough tokens to start a session");
+        IERC20( ai.feeToken() ).safeTransfer(ai.feeTarget(), amount);
+        sessionId = ai.startUserSession();
     }
 
     function callback(bytes32 _requestId) external onlyDtn {
         (IDtnAi.ResponseStatus status, string memory message, bytes memory response) = ai.fetchResponse(_requestId);
         result = abi.decode(response, (string));
         emit Result(_requestId, status, message, result);
+    }
+
+    function callbackIpfs(bytes32 _requestId) external onlyDtn {
+        (IDtnAi.ResponseStatus status, string memory message, bytes memory response) = ai.fetchResponse(_requestId);
+        ipfsCid = abi.decode(response, (string));
+        emit Result(_requestId, status, message, ipfsCid);
     }
 
     function aiError(bytes32 _requestId) external onlyDtn {

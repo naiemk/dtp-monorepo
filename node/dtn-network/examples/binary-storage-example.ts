@@ -8,7 +8,7 @@ const pinataConfig: PinataConfig = {
 };
 
 async function demonstrateBinaryStorage() {
-    const ipfsClient = new IpfsClient(pinataConfig);
+    const ipfsClient = new IpfsClient(pinataConfig, 'node-1');
 
     try {
         console.log('Testing IPFS connection...');
@@ -158,7 +158,7 @@ type AIResponse = TextResponse | JsonResponse | ImageResponse;
 
 // Example of storing AI model responses
 async function demonstrateAIResponseStorage() {
-    const ipfsClient = new IpfsClient(pinataConfig);
+    const ipfsClient = new IpfsClient(pinataConfig, 'node-1');
 
     console.log('\n=== AI Response Storage Examples ===');
 

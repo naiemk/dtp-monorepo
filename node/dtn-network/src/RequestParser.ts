@@ -3,6 +3,7 @@ import type { NodeConfig, RouterRequest } from "./types";
 import type { AiRequest } from "./aiClient";
 import { Logger, LogLevel } from "./logger";
 import { ERROR_CODES } from "./errors";
+import { jsonStringifyWithBigInt } from "./EthersUtils";
 
 interface ModelApi {
     apiNamespaceId: string;
@@ -42,7 +43,13 @@ export class RequestParser {
         ) as unknown as ModelManagerContract;
     }
 
-    async parseRouterRequest(requestId: string, request: RouterRequest): Promise<AiRequest> {
+    /**
+     * Parses the router request and returns the formatted call object. You need to set the model field yourself.
+     * @param requestId - The request ID
+     * @param request - The router request
+     * @returns The formatted call object
+     */
+    async parseRouterRequest(requestId: string, request: RouterRequest): Promise<Partial<AiRequest>> {
         // Get the model API specification
         let modelApi = this.modelAPIs[request.modelId];
         if (!modelApi) {
@@ -52,7 +59,7 @@ export class RequestParser {
                 throw new Error(`Model API not found for model ${request.modelId}`);
             }
             this.modelAPIs[request.modelId] = modelApi;
-            this.logger.debug(`Received model API for model ${request.modelId}: ${JSON.stringify(modelApi)}`);
+            this.logger.debug(`Received model API for model ${request.modelId}: ${jsonStringifyWithBigInt(modelApi)}`);
         }
 
         // Parse the model API specs to get parameter types
@@ -68,7 +75,7 @@ export class RequestParser {
             this.logger.error(`ABI decode error for call: ${err}`);
             throw new AbiDecodeError(`${ERROR_CODES.P0011.code}: ${ERROR_CODES.P0011.message}`);
         }
-        this.logger.debug(`Model params: ${JSON.stringify(modelParams)}`);
+        this.logger.debug(`Model params: ${jsonStringifyWithBigInt(modelParams)}`);
         
         // Extract parameter types from decoded values that contain placeholders
         const extractedParameterTypes: string[] = [];
@@ -96,11 +103,10 @@ export class RequestParser {
             types: apiParameterTypes,
         };
         
-        this.logger.debug(`Formatted call: ${JSON.stringify(formattedCall)}`);
+        this.logger.debug(`Formatted call: ${jsonStringifyWithBigInt(formattedCall)}`);
         
         return {
             requestId: requestId,
-            model: request.modelId,
             call: formattedCall
         };
     }

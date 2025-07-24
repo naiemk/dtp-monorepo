@@ -1,5 +1,6 @@
 import { namespaceToId, type NodeConfig, type RouterRequest } from "./types";
 import { Logger, LogLevel } from "./logger";
+import { jsonStringifyWithBigInt } from "./EthersUtils";
 
 export interface AiResponse {
     requestId: string;
@@ -25,13 +26,13 @@ export class AiClient {
     }
 
     async request(request: AiRequest): Promise<AiResponse> {
-        this.logger.debug(`AI client request to ${this.host}: ${JSON.stringify(request)}`);
-        const response = await fetch(this.host, {
+        this.logger.debug(`AI client request to ${this.host}: ${jsonStringifyWithBigInt(request)}`);
+        const response = await fetch(`${this.host}/api/request`, {
             method: "POST",
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ ...request }),
+            body: jsonStringifyWithBigInt({ ...request }),
         });
         
         if (!response.ok) {

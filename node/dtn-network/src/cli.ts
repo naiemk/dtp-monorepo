@@ -106,8 +106,7 @@ function validateEnvironmentVariables(config: NodeConfig): void {
     console.log('🔍 Validating environment variables...');
     
     const requiredVars = [
-        config.keys.ownerPrivateKey,
-        config.keys.workerPrivateKey
+        config.keys.workerPrivateKey,
     ];
 
     const missingVars = requiredVars.filter(varName => !process.env[varName]);
