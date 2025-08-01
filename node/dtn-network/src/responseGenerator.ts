@@ -143,9 +143,9 @@ export class ResponseGenerator {
             // Handle different data types
             if (typeof data === 'string') {
                 // Store as JSON string
-                console.log(`Storing data as JSON string for request ${requestId}`);
-                cid = await this.ipfsClient.storeJson(data, {
-                    filename: `response-${requestId}.json`,
+                console.log(`Storing data as string for request ${requestId}`);
+                cid = await this.ipfsClient.storeText(data, {
+                    filename: `response-${requestId}`,
                     metadata: {
                         requestId,
                         dataType: 'string',

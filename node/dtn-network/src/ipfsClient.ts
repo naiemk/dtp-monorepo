@@ -111,6 +111,17 @@ export class IpfsClient {
     /**
      * Store JSON data with proper content type
      */
+    async storeText(data: string, options?: StoreOptions): Promise<string> {
+        return this.store(data, {
+            ...options,
+            filename: options?.filename || 'data.txt',
+            contentType: 'text/plain; charset=utf-8'
+        });
+    }
+
+    /**
+     * Store JSON data with proper content type
+     */
     async storeJson(data: any, options?: StoreOptions): Promise<string> {
         const jsonString = JSON.stringify(data, null, 2);
         return this.store(jsonString, {
