@@ -4,7 +4,7 @@
 
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-const MODEL_MANAGER = "0x6dcd95F868061AE163bb612392FeaB69BF86E76a";
+const MODEL_MANAGER = "0x27d0BAEcb181c3bB1B5850049092D40eE7b1fE3d";
 
 const RegisterInitialModels = buildModule("RegisterInitialModels", (m) => {
   const modelManagerAddr = m.getParameter("modelManager", MODEL_MANAGER);
@@ -16,15 +16,20 @@ const RegisterInitialModels = buildModule("RegisterInitialModels", (m) => {
   const API_LLM_SIMPLETEXT = "llm-simpletext";
   const API_LLM_SIMPLEIMAGE = "llm-simpleimage";
   const MODE_NAMESPACE = "model.system";
-  const MODE_LLM_SIMPLETEXT = "llm-simpletext";
-  const MODE_LLM_SIMPLEIMAGE = "llm-simpleimage";
+  const OPEN_AI_IMAGE = 'openai-gpt-image-1'
+  const OPEN_AI_GPT5 = 'openai-gpt-5'
+  const OPEN_AI_GPT5_MINI = 'openai-gpt-5-mini'
+  const OPEN_AI_GPT5_NANO = 'openai-gpt-5-nano'
 
   m.call(modelManager, "registerModelAPI", [API_NAMESPACE, API_LLM_SIMPLETEXT, "string[] -> string",
-    "prompt: string[] /* prompt */ -> returns: string /* LLM response */"]);
+    "prompt: string[] /* prompt */ -> returns: string /* LLM response */"], { id: "registerModelAPI1" });
   m.call(modelManager, "registerModelAPI", [API_NAMESPACE, API_LLM_SIMPLEIMAGE, "string[], uint64, uint64 -> bytes",
-    "prompt: string[] /* prompt */, image_width: uint64 /* image width */, image_height: uint64 /* image height */ -> image: bytes /* Generated image */"]);
-  m.call(modelManager, "registerModel", [MODE_NAMESPACE, MODE_LLM_SIMPLETEXT, API_NAMESPACE + "." + API_LLM_SIMPLETEXT]);
-  m.call(modelManager, "registerModel", [MODE_NAMESPACE, MODE_LLM_SIMPLEIMAGE, API_NAMESPACE + "." + API_LLM_SIMPLEIMAGE]);
+    "prompt: string[] /* prompt */, image_width: uint64 /* image width */, image_height: uint64 /* image height */ -> image: bytes /* Generated image */"],
+    { id: "registerModelAPI2" });
+  m.call(modelManager, "registerModel", [MODE_NAMESPACE, OPEN_AI_GPT5_NANO, API_NAMESPACE + "." + API_LLM_SIMPLETEXT], { id: "registerModel1" });
+  m.call(modelManager, "registerModel", [MODE_NAMESPACE, OPEN_AI_GPT5_MINI, API_NAMESPACE + "." + API_LLM_SIMPLETEXT], { id: "registerModel2" });
+  m.call(modelManager, "registerModel", [MODE_NAMESPACE, OPEN_AI_GPT5, API_NAMESPACE + "." + API_LLM_SIMPLETEXT], { id: "registerModel3" });
+  m.call(modelManager, "registerModel", [MODE_NAMESPACE, OPEN_AI_IMAGE, API_NAMESPACE + "." + API_LLM_SIMPLEIMAGE], { id: "registerModel4" });
 
   return { modelManager };
 });

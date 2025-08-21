@@ -42,6 +42,11 @@ const config: HardhatUserConfig = {
       url: "https://eth-sepolia.g.alchemy.com/public",
       accounts: [process.env.PRIVATE_KEY || ''],
     },
+    base: {
+      url: process.env.BASE_RPC_URL || '',
+      accounts: [process.env.PRIVATE_KEY || ''],
+      chainId: 8453,
+    }
   },
   ignition: {
     strategyConfig: {

@@ -2,16 +2,11 @@
 // Learn more about it at https://hardhat.org/ignition
 
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
-import { keccak256, toUtf8Bytes, ZeroAddress } from "ethers";
+import { ZeroAddress } from "ethers";
 
-const TOKEN = "0x0000000000000000000000000000000000000000";
-
-const LockModule = buildModule("DeployRouter", (m) => {
+const DeployRouterModule = buildModule("DeployRouter", (m) => {
   const owner = m.getParameter("owner", m.getAccount(0));
-  const token = m.getParameter("token", TOKEN);
-
-  // Calculate role hashes
-  const NAMESPACE_ADMIN_ROLE = keccak256(toUtf8Bytes("NAMESPACE_ADMIN_ROLE"));
+  const token = m.getParameter("token");
 
   // Deploy NamespaceManager implementation and proxy
   const namespaceManagerImpl = m.contract("NamespaceManager", [], { id: "namespaceManagerImpl" });
@@ -57,4 +52,4 @@ const LockModule = buildModule("DeployRouter", (m) => {
   return { router, namespaceManager, nodeManager, sessionManager, modelManager };
 });
 
-export default LockModule;
+export default DeployRouterModule;
