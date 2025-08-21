@@ -14,6 +14,19 @@ from openai import OpenAI, BadRequestError
 
 logger = logging.getLogger(__name__)
 
+def _translate_model_name(model: str) -> str:
+    """Translate model name to OpenAI model name"""
+    if "gpt-5" in model:
+        return "gpt-5"
+    elif "gpt-5-mini" in model:
+        return "gpt-5-mini"
+    elif "gpt-5-nano" in model:
+        return "gpt-5-nano"
+    elif "image" in model:
+        return "gpt-image-1"
+    else:
+        raise ValueError(f"Unknown model name: {model}")
+
 class ApiError(Exception):
     """Custom exception for API errors"""
     def __init__(self, message: str, error_code: Optional[str] = None):
@@ -89,9 +102,9 @@ def execute_call(model: str, parameters: List[Any], types: List[str]) -> Tuple[A
         logger.info(f"Processing {model} with parameters: {parameters}, types: {types}")
         
         # Determine the model type from the model name
-        if "simpletext" in model:
-            return _handle_text_generation(parameters, types)
-        elif "simpleimage" in model:
+        if "gpt-5" in model:
+            return _handle_text_generation(parameters, model,types)
+        elif "image" in model:
             return _handle_image_generation(parameters, types)
         else:
             raise ValueError(f"Unknown model type: {model}")
@@ -100,7 +113,7 @@ def execute_call(model: str, parameters: List[Any], types: List[str]) -> Tuple[A
         logger.error(f"Error in execute_call for model {model}: {e}")
         raise
 
-def _handle_text_generation(parameters: List[Any], types: List[str]) -> Tuple[str, str]:
+def _handle_text_generation(parameters: List[Any], model: str, types: List[str]) -> Tuple[str, str]:
     """
     Handle text generation requests
     
@@ -128,7 +141,7 @@ def _handle_text_generation(parameters: List[Any], types: List[str]) -> Tuple[st
         client = _get_openai_client()
         # Use GPT-4o for text generation (latest model)
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model=_translate_model_name(model),
             messages=[
                 {"role": "user", "content": prompt}
             ],

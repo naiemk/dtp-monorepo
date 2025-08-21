@@ -237,6 +237,7 @@ export async function configureNode(configPath: string) {
     const provider = new ethers.JsonRpcProvider(config.network.rpcUrl);
     const { ownerPrivateKey, workerPrivateKey } = config.keys;
     const ownerWallet = ownerPrivateKey ? new ethers.Wallet(ownerPrivateKey, provider) : null;
+    console.log('> ownerWallet', ownerWallet?.address);
 
     if (ownerWallet) {
         await registerUserIfNotExists(ownerWallet, config.node.username, config);
