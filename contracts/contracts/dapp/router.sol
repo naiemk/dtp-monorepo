@@ -43,6 +43,7 @@ contract RouterUpgradeable is
         mapping(bytes32 => Request) requests;
         mapping(bytes32 => IDtnAi.Response[]) responses;
         mapping(bytes32 => mapping(bytes32 => bool)) nodeResponded; // requestId => nodeId => hasResponded
+        uint256 failureResponsePerByte;
     }
 
     struct Request {
@@ -94,6 +95,9 @@ contract RouterUpgradeable is
         _setRoleAdmin(Dtn.SYSTEM_ADMIN_ROLE, Dtn.OWNER_ROLE);
         _setRoleAdmin(Dtn.TRUST_ADMIN_ROLE, Dtn.SYSTEM_ADMIN_ROLE);
         _setRoleAdmin(Dtn.GENERAL_ADMIN_ROLE, Dtn.SYSTEM_ADMIN_ROLE);
+
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        $.failureResponsePerByte = 1;
     }
 
     function __Router_init_unchained() internal onlyInitializing {
@@ -118,6 +122,11 @@ contract RouterUpgradeable is
     function feeTarget() public override view returns (address) {
         RouterStorageV001 storage $ = getRouterStorageV001();
         return ISessionManager($.sessionManager).getFeeTarget();
+    }
+
+    function config(uint256 _failureResponsePerByte) external onlyOwner {
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        $.failureResponsePerByte = _failureResponsePerByte;
     }
 
     /**
@@ -162,11 +171,26 @@ contract RouterUpgradeable is
         return $.requests[requestId];
     }
 
-    function setDependencies(address nodeManager, address sessionManager, address modelManager) external onlyOwner {
+    function nodeManager() public view returns (address) {
         RouterStorageV001 storage $ = getRouterStorageV001();
-        $.nodeManager = nodeManager;
-        $.sessionManager = sessionManager;
-        $.modelManager = modelManager;
+        return $.nodeManager;
+    }
+
+    function sessionManager() public view returns (address) {
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        return $.sessionManager;
+    }
+
+    function modelManager() public view returns (address) {
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        return $.modelManager;
+    }
+
+    function setDependencies(address _nodeManager, address _sessionManager, address _modelManager) external onlyOwner {
+        RouterStorageV001 storage $ = getRouterStorageV001();
+        $.nodeManager = _nodeManager;
+        $.sessionManager = _sessionManager;
+        $.modelManager = _modelManager;
     }
 
     /**
@@ -345,23 +369,33 @@ contract RouterUpgradeable is
             INodeManager($.nodeManager).nodeServesModel(nodeId, requestData.modelId),
             "Node does not serve requested model"
         );
-
         }
 
-
-        // Calculate request fee using request-specific rate
-        uint256 requestFee = requestSize * requestData.request.feePerByteReq;
-        
-        // Calculate response fee using response-specific rate
-        uint256 responseFee = responseSize * requestData.request.feePerByteRes;
-        
-        // Ensure response fee doesn't exceed maximum allowed. Override the max so that the node can't charge more than the user.
-        if (responseFee > requestData.request.totalFeePerRes) {
-            responseFee = requestData.request.totalFeePerRes;
+        uint256 totalFee;
+        {
+        uint256 requestFee;
+        uint256 responseFee;
+        if (status == ResponseStatus.FAILURE) {
+            uint256 failureResponsePerByte = $.failureResponsePerByte;
+            requestFee = requestSize * failureResponsePerByte;
+            responseFee = responseSize * failureResponsePerByte;
+        } else {
+            requestFee = requestSize * requestData.request.feePerByteReq;
+            responseFee = responseSize * requestData.request.feePerByteRes;
         }
 
         // Charge the session for both request and response fees
-        uint256 totalFee = requestFee + responseFee;
+        totalFee = requestFee + responseFee;
+        // Ensure fee doesn't exceed maximum allowed. Override the max so that the node can't charge more than the user.
+        if (totalFee > requestData.request.totalFeePerRes) {
+            totalFee = requestData.request.totalFeePerRes;
+        }
+
+        uint sessionBalance = ISessionManager($.sessionManager).getSessionBalance(requestData.sessionId);
+        if (sessionBalance < totalFee) {
+            totalFee = sessionBalance;
+        }
+        }
         ISessionManager($.sessionManager).chargeUserSession(requestData.sessionId, totalFee, msg.sender);
 
         // Create and add response

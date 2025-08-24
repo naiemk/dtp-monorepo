@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "../core/multiowner-base.sol";
 import "./isession-manager.sol";
 import "hardhat/console.sol";
@@ -12,7 +13,11 @@ import "hardhat/console.sol";
  * @title SessionManager
  * @notice SessionManager is responsible for managing sessions
  */
-contract SessionManagerUpgradeable is Initializable, MultiOwnerBase, ISessionManager {
+contract SessionManagerUpgradeable is
+    Initializable,
+    UUPSUpgradeable,
+    MultiOwnerBase,
+    ISessionManager {
     using SafeERC20 for IERC20;
 
     /// @custom:storage-location erc7201:dtn.storage.sessionmanager.001
@@ -158,6 +163,10 @@ contract SessionManagerUpgradeable is Initializable, MultiOwnerBase, ISessionMan
         return _getStorage().sessions[sessionId];
     }
 
+    function getSessionBalance(uint sessionId) public view returns (uint) {
+        return _getStorage().sessions[sessionId].balance;
+    }
+
     function getUserSessionIds(address user) public view returns (uint[] memory) {
         return _getStorage().userSessionIds[user];
     }
@@ -178,4 +187,14 @@ contract SessionManagerUpgradeable is Initializable, MultiOwnerBase, ISessionMan
     function getFeeTarget() public view returns (address) {
         return _getStorage().feeTarget;
     }
+
+    /**
+     * @notice Sweeps the balance of the given token to the given address
+     * This can be used for emergencies. Remove in future versions.
+     */
+    function sweep(address _feeToken, address to) external onlyOwner {
+        IERC20(_feeToken).safeTransfer(to, IERC20(_feeToken).balanceOf(address(this)));
+    }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

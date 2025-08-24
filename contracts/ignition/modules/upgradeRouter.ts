@@ -3,7 +3,7 @@
 
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
-const ROUTER_ADDRESS = "0x1BC1062B3cCDe51b7727098B0488Fd71c9f784B2";
+const ROUTER_ADDRESS = "0x45B80f551646fDaC777A4991FbdA748Fc5A72194";
 
 const UpgradeRouterModule = buildModule("UpgradeRouter", (m) => {
   const owner = m.getParameter("owner", m.getAccount(0));

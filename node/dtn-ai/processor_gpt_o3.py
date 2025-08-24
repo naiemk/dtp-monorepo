@@ -55,10 +55,9 @@ def _sanitize_prompt(prompt: str) -> str:
     )
     try:
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-5-nano",
             messages=[{"role": "user", "content": sanitize_instruction}],
-            max_tokens=1000,
-            temperature=0.3,
+            max_completion_tokens=4000,
         )
         sanitized = response.choices[0].message.content
         if not sanitized:
@@ -139,14 +138,12 @@ def _handle_text_generation(parameters: List[Any], model: str, types: List[str])
 
     try:
         client = _get_openai_client()
-        # Use GPT-4o for text generation (latest model)
         response = client.chat.completions.create(
             model=_translate_model_name(model),
             messages=[
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=1000,
-            temperature=0.7
+            max_completion_tokens=40000,
         )
         
         generated_text = response.choices[0].message.content

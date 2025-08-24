@@ -17,5 +17,7 @@ interface ISessionManager {
 
     function getSessionById(uint256 sessionId) external view returns (Session memory);
 
+    function getSessionBalance(uint256 sessionId) external view returns (uint);
+
     function chargeUserSession(uint256 sessionId, uint256 amount, address to) external;
 }

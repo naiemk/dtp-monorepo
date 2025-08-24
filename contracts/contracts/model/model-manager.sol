@@ -2,6 +2,8 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "./imodel-manager.sol";
 import "hardhat/console.sol";
 import "../utils/idtn-ai.sol";
@@ -12,7 +14,12 @@ import "../core/inamespace-manager.sol";
  * @title ModelManager
  * @notice Manages model APIs and model registration
  */
-contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDtnAiModels {
+contract ModelManagerUpgradeable is
+    Initializable,
+    UUPSUpgradeable,
+    AccessControlUpgradeable,
+    IModelManager,
+    IDtnAiModels {
     bytes32 public constant NAMESPACE_ADMIN_ROLE = keccak256("NAMESPACE_ADMIN_ROLE");
     error InvalidModelApi(string modelApi);
 
@@ -185,4 +192,6 @@ contract ModelManagerUpgradeable is IModelManager, AccessControlUpgradeable, IDt
     {
         return keccak256(abi.encodePacked(modelFullName));
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }

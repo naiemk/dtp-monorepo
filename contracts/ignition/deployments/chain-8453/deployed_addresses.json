@@ -14,5 +14,11 @@
   "DeployRouter#sessionManager": "0x8aaEb07881eb18183fFE98afF10b55f8e7318536",
   "DeployRouter#nodeManagerProxy": "0xa579c301bB320276b85Ec12C6693eCf9f493146B",
   "DeployRouter#nodeManager": "0xa579c301bB320276b85Ec12C6693eCf9f493146B",
-  "RegisterInitialModels#modelManager": "0x27d0BAEcb181c3bB1B5850049092D40eE7b1fE3d"
+  "RegisterInitialModels#modelManager": "0x27d0BAEcb181c3bB1B5850049092D40eE7b1fE3d",
+  "UpgradeRouter#existingRouter_2": "0x45B80f551646fDaC777A4991FbdA748Fc5A72194",
+  "UpgradeRouter#newRouter_2": "0xB82dBE6E26b3E1F20D9d336a2578bF35D4d813ce",
+  "UpgradeSessionManager#router": "0x45B80f551646fDaC777A4991FbdA748Fc5A72194",
+  "UpgradeSessionManager#sessionManagerImpl2": "0x5f7B6585048a6466c3cDd05515639E96e58DC14C",
+  "UpgradeSessionManager#sessionManagerProxyNewVersionUpgradeable": "0xB93f4869C36beF19C610c32e2596C1abb8Fa878d",
+  "UpgradeSessionManager#sessionManagerTmp1": "0xB93f4869C36beF19C610c32e2596C1abb8Fa878d"
 }

@@ -38,6 +38,7 @@ export interface NodeConfig {
         modelManagerAddress: string;
         namespaceManagerAddress: string;
         routerAddress: string;
+        sessionManagerAddress: string;
     };
     ipfs: IpfsConfig;
     modelApis: ModelApiConfig [];

@@ -22,6 +22,7 @@ export class ResponseGenerator {
     private provider: ethers.JsonRpcProvider | undefined;
     private wallet: ethers.Wallet | undefined;
     private routerContract: ethers.Contract | undefined;
+    private sessionManagerContract: ethers.Contract | undefined;
     private nodeId: string | undefined;
     private models: Map<string, string> | undefined;
     private ipfsClient: IpfsClient | undefined;
@@ -47,7 +48,16 @@ export class ResponseGenerator {
             ],
             this.wallet
         );
-        this.routerContract = contractRaw; 
+        this.routerContract = contractRaw;
+
+        // Initialize session manager contract for balance checks
+        this.sessionManagerContract = new ethers.Contract(
+            config.network.sessionManagerAddress,
+            [
+                "function getSessionById(uint256 sessionId) view returns (tuple(address owner, uint256 balance))"
+            ],
+            this.provider
+        ); 
 
         this.nodeId = namespaceToId(`node.${this.config.node.username}.${this.config.node.nodeName}`);
         // Initialize IPFS client
@@ -116,12 +126,34 @@ export class ResponseGenerator {
             // 3. Calculate request size
             const requestSize = BigInt(request.request.call.length / 2); // Hex string length / 2 = bytes
 
+            // Normalize the sizes to ensure fee calculation stays within limits
+            const { normalizedRequestSize, normalizedResponseSize } = this.normalizeDataSizeForFee(
+                requestSize,
+                responseSize,
+                request.request.feePerByteReq,
+                request.request.feePerByteRes,
+                request.request.totalFeePerRes
+            );
+
+            // Check if the session balance is sufficient for the total fee
+            const totalFee = normalizedRequestSize * request.request.feePerByteReq + 
+                           normalizedResponseSize * request.request.feePerByteRes;
+            
+            const sessionBalance = await this.getSessionBalance(request.sessionId);
+            
+            if (sessionBalance < totalFee) {
+                this.logger.warn(`Insufficient session balance for request ${requestId}. Required: ${totalFee}, Available: ${sessionBalance}`);
+                // Let's just use whatever that is available
+                // await this.recordErrorResponse(requestId, "Insufficient session balance", request, true);
+                // return;
+            }
+
             // 4. Record successful response on-chain
             await this.recordSuccessResponse(
                 requestId,
                 finalResponse,
-                requestSize,
-                responseSize,
+                normalizedRequestSize,
+                normalizedResponseSize,
                 isIPFS ? "string" : responseType
             );
 
@@ -202,7 +234,7 @@ export class ResponseGenerator {
                 responseData,
                 this.nodeId,
                 requestSize,
-                responseSize
+                0n, // responseSize
                 ]
             );
             console.log(`Recording success response for request ${requestId}, tx: ${txResponse.hash}`);
@@ -239,6 +271,15 @@ export class ResponseGenerator {
             const requestSize = BigInt(request.request.call.length / 2);
             const responseSize = BigInt(0); // No response for error
 
+            // Normalize sizes for consistency (even though response size is 0)
+            const { normalizedRequestSize, normalizedResponseSize } = this.normalizeDataSizeForFee(
+                aiProcessed ? requestSize : BigInt(0),
+                responseSize,
+                request.request.feePerByteReq,
+                request.request.feePerByteRes,
+                request.request.totalFeePerRes
+            );
+
             const txResponse = await sendWithGasEstimate<RespondToRequestParams>(
                 this.routerContract,
                 "respondToRequest",
@@ -248,8 +289,8 @@ export class ResponseGenerator {
                 safeMessage,
                 "0x", // Empty response for failure
                 this.nodeId,
-                aiProcessed ? requestSize : BigInt(0),
-                responseSize
+                normalizedRequestSize,
+                normalizedResponseSize
                 ]
             );
             console.log(`Recording error response for request ${requestId}, tx: ${txResponse.hash}`);
@@ -267,5 +308,116 @@ export class ResponseGenerator {
             throw new Error(`Model ${modelId} not found in config`);
         }
         return model;
+    }
+
+    /**
+     * Gets the session balance by calling the session manager contract directly
+     * @param sessionId - The session ID to check
+     * @returns The session balance
+     */
+    private async getSessionBalance(sessionId: bigint): Promise<bigint> {
+        if (!this.sessionManagerContract) {
+            throw new Error("Session manager contract not initialized");
+        }
+
+        try {
+            // Call the session manager's getSessionById function directly
+            const session = await this.sessionManagerContract!.getSessionById!(sessionId);
+            return session.balance;
+        } catch (error) {
+            this.logger.error(`Failed to get session balance for session ${sessionId}:`, error);
+            // Return 0 if we can't get the balance, which will trigger the insufficient balance check
+            return BigInt(0);
+        }
+    }
+
+    /**
+     * Normalizes request and response sizes to ensure the total fee calculation
+     * stays within the allowed limit (totalFeePerRes).
+     * 
+     * @param requestSize - Original request size in bytes
+     * @param responseSize - Original response size in bytes
+     * @param feePerByteReq - Fee per byte for request
+     * @param feePerByteRes - Fee per byte for response
+     * @param totalFeePerRes - Maximum total fee allowed
+     * @returns Object containing normalized request and response sizes
+     */
+    private normalizeDataSizeForFee(
+        requestSize: bigint,
+        responseSize: bigint,
+        feePerByteReq: bigint,
+        feePerByteRes: bigint,
+        totalFeePerRes: bigint
+    ): { normalizedRequestSize: bigint; normalizedResponseSize: bigint } {
+        // Calculate the total fee with current sizes
+        const totalFee = requestSize * feePerByteReq + responseSize * feePerByteRes;
+        
+        // If we're already within the limit, return original sizes
+        if (totalFee <= totalFeePerRes) {
+            return {
+                normalizedRequestSize: requestSize,
+                normalizedResponseSize: responseSize
+            };
+        }
+
+        // Calculate how much we need to reduce
+        const excessFee = totalFee - totalFeePerRes;
+        
+        // If feePerByteRes is 0, we can only reduce request size
+        if (feePerByteRes === BigInt(0)) {
+            if (feePerByteReq === BigInt(0)) {
+                // Both fees are 0, return original sizes
+                return {
+                    normalizedRequestSize: requestSize,
+                    normalizedResponseSize: responseSize
+                };
+            }
+            
+            // Only reduce request size
+            const requestSizeReduction = excessFee / feePerByteReq;
+            const normalizedRequestSize = requestSize > requestSizeReduction 
+                ? requestSize - requestSizeReduction 
+                : BigInt(0);
+            
+            return {
+                normalizedRequestSize,
+                normalizedResponseSize: responseSize
+            };
+        }
+
+        // If feePerByteReq is 0, we can only reduce response size
+        if (feePerByteReq === BigInt(0)) {
+            const responseSizeReduction = excessFee / feePerByteRes;
+            const normalizedResponseSize = responseSize > responseSizeReduction 
+                ? responseSize - responseSizeReduction 
+                : BigInt(0);
+            
+            return {
+                normalizedRequestSize: requestSize,
+                normalizedResponseSize
+            };
+        }
+
+        // Both fees are non-zero, distribute reduction proportionally
+        // Calculate the ratio of response fee to total fee
+        const responseFeeRatio = (responseSize * feePerByteRes) / totalFee;
+        const requestFeeRatio = BigInt(1) - responseFeeRatio;
+        
+        // Distribute the excess fee reduction proportionally
+        const responseFeeReduction = (excessFee * responseFeeRatio) / feePerByteRes;
+        const requestFeeReduction = (excessFee * requestFeeRatio) / feePerByteReq;
+        
+        // Apply reductions with safety checks
+        const normalizedResponseSize = responseSize > responseFeeReduction 
+            ? responseSize - responseFeeReduction 
+            : BigInt(0);
+        const normalizedRequestSize = requestSize > requestFeeReduction 
+            ? requestSize - requestFeeReduction 
+            : BigInt(0);
+        
+        return {
+            normalizedRequestSize,
+            normalizedResponseSize
+        };
     }
 }
