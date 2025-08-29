@@ -45,16 +45,20 @@ python3 -c "import yaml" 2>/dev/null || {
 echo "🐳 Generating docker-compose configuration..."
 python3 generate-compose.py
 
-# Make scripts executable
-chmod +x generate-compose.py
+# Download keystore.sh in docker-composefoler
+echo "🔑 Downloading keystore.sh..."
+wget https://raw.githubusercontent.com/DeepTrustNet/dtp-monorepo/refs/heads/main/node/dtn-network/keystore.sh -O ./docker-compose/keystore.sh
+chmod +x ./docker-compose/keystore.sh
 
 echo ""
 echo "✅ Setup complete!"
 echo ""
 echo "📋 Next steps:"
-echo "1. Edit .env file with your actual values"
-echo "2. Run: docker-compose up -d"
-echo "3. Check logs: docker-compose logs -f"
+echo "1. cd ./docker-compose"
+echo "2. record your keys using keystore.sh"
+echo "3. Edit .env file with your actual values"
+echo "4. Run: docker-compose up -d"
+echo "5. Check logs: docker-compose logs -f"
 echo ""
 echo "📁 Generated files:"
 echo "  - docker-compose.yml (complete setup)"

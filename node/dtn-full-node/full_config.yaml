@@ -8,6 +8,9 @@ dtn-network:
     ownerPrivateKey: cccq8xqchc5taeul377wvynshh2awxp2n2nkynvc4vw # Replace with actual address from keystore
     workerPrivateKey: cccq8xqchc5taeul377wvynshh2awxp2n2nkynvc4vw # Replace with actual address from keystore
 
+  local:
+    cacheDir: /app/cache
+
   network:
     rpcUrl: "BASE_RPC_URL"
     chainId: 8453

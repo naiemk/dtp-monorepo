@@ -63,4 +63,4 @@ ENV NODE_ENV=production
 ENTRYPOINT ["dumb-init", "--"]
 
 # Default command
-CMD ["bun", "dist/index.cjs", "--help"] 
+CMD ["bun", "dist/index.cjs", "--config", "nodeConfig.yaml", "loop"] 

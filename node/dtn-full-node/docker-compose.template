@@ -6,6 +6,7 @@ services:
     environment:
       - NODE_ENV=production
       - FOUNDRY_KEYSTORE_PASSPHRASE=${FOUNDRY_KEYSTORE_PASSPHRASE}
+      - FOUNDRY_KEYSTORE_PATH=/app/keystore
     volumes:
       # Mount config file if needed
       - ./dtn-network.yaml:/app/nodeConfig.yaml:ro

@@ -44,4 +44,4 @@ USER nodejs
 ENV NODE_ENV=production
 
 # Default command
-CMD ["node", "dist/index.js", "--help"] 
+CMD ["bun", "dist/index.cjs", "--config", "nodeConfig.yaml", "loop"] 
