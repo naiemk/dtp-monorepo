@@ -11,6 +11,7 @@ import { configureNode } from './scripts/confiureNode';
 import type { NodeConfig } from './types';
 import dotenv from 'dotenv';
 import { Logger, LogLevel } from './logger';
+import { keystoreManager } from './keystore';
 
 // Load environment variables from multiple possible config files
 const envFiles = ['.env', '.env.production', 'localConfig/.env'];
@@ -78,7 +79,7 @@ function initializeLogging(verbose: boolean, logLevelStr: string): LogLevel {
 /**
  * Load and validate configuration
  */
-function loadConfiguration(configPath: string): NodeConfig {
+async function loadConfiguration(configPath: string): Promise<NodeConfig> {
     console.log(`📋 Loading configuration from: ${configPath}`);
     
     if (!fs.existsSync(configPath)) {
@@ -89,8 +90,8 @@ function loadConfiguration(configPath: string): NodeConfig {
         const configContent = fs.readFileSync(configPath, 'utf8');
         const config = yaml.parse(configContent) as NodeConfig;
         
-        // Validate required environment variables
-        validateEnvironmentVariables(config);
+        // Validate required keystore keys
+        await validateKeystoreKeys(config);
         
         console.log('✅ Configuration loaded successfully');
         return config;
@@ -100,22 +101,33 @@ function loadConfiguration(configPath: string): NodeConfig {
 }
 
 /**
- * Validate required environment variables
+ * Validate required keystore keys
  */
-function validateEnvironmentVariables(config: NodeConfig): void {
-    console.log('🔍 Validating environment variables...');
+async function validateKeystoreKeys(config: NodeConfig): Promise<void> {
+    console.log('🔍 Validating keystore keys...');
     
-    const requiredVars = [
+    const requiredKeys = [
         config.keys.workerPrivateKey,
     ];
 
-    const missingVars = requiredVars.filter(varName => !process.env[varName]);
-    
-    if (missingVars.length > 0) {
-        throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+    // Add ownerPrivateKey if it's specified and not empty
+    if (config.keys.ownerPrivateKey && config.keys.ownerPrivateKey.trim() !== '') {
+        requiredKeys.push(config.keys.ownerPrivateKey);
+    }
+
+    const missingKeys = [];
+    for (const keyName of requiredKeys) {
+        const hasKey = await keystoreManager.hasKey(keyName);
+        if (!hasKey) {
+            missingKeys.push(keyName);
+        }
     }
     
-    console.log('✅ Environment variables validated');
+    if (missingKeys.length > 0) {
+        throw new Error(`Missing required keystore keys: ${missingKeys.join(', ')}. Make sure the keys exist in your foundry keystore.`);
+    }
+    
+    console.log('✅ Keystore keys validated');
 }
 
 /**
@@ -211,7 +223,7 @@ program
         
         try {
             const selectedLogLevel = initializeLogging(verbose, logLevel);
-            const config = loadConfiguration(configPath);
+            const config = await loadConfiguration(configPath);
             await runOnce(config, selectedLogLevel);
         } catch (error) {
             console.error('❌ Command failed:', error instanceof Error ? error.message : 'Unknown error');
@@ -234,7 +246,7 @@ program
         
         try {
             const selectedLogLevel = initializeLogging(verbose, logLevel);
-            const config = loadConfiguration(configPath);
+            const config = await loadConfiguration(configPath);
             await runLoop(config, interval, selectedLogLevel);
         } catch (error) {
             console.error('❌ Command failed:', error instanceof Error ? error.message : 'Unknown error');

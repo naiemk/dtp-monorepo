@@ -7,6 +7,7 @@ import { AbiDecodeError } from "./RequestParser";
 import { AbiCoder } from "ethers";
 import { Logger, LogLevel } from "./logger";
 import { parseBinaryData, sendWithGasEstimate } from "./EthersUtils";
+import { keystoreManager } from "./keystore";
 
 type RespondToRequestParams = [
     requestId: string,
@@ -31,43 +32,54 @@ export class ResponseGenerator {
     constructor(private readonly config: NodeConfig, private readonly requestParser: RequestParser, logLevel: LogLevel = LogLevel.INFO) {
         this.logger = new Logger(logLevel);
         this.provider = new ethers.JsonRpcProvider(config.network.rpcUrl);
-        const privateKey = process.env[config.keys.workerPrivateKey];
-        if (!privateKey) {
-            throw new Error("Worker private key is not set");
-        }
-        this.wallet = new ethers.Wallet(privateKey, this.provider);
-
-        this.logger.info(`ResponseGenerator: Initializing router contract with address ${config.network.routerAddress}`);
-        this.logger.info(`ResponseGenerator: Using worker address ${this.wallet?.address}`);
-
-        // Initialize router contract
-        const contractRaw = new ethers.Contract(
-            config.network.routerAddress,
-            [
-                "function respondToRequest(bytes32 requestId, uint8 status, string message, bytes response, bytes32 nodeId, uint256 requestSize, uint256 responseSize) external"
-            ],
-            this.wallet
-        );
-        this.routerContract = contractRaw;
-
-        // Initialize session manager contract for balance checks
-        this.sessionManagerContract = new ethers.Contract(
-            config.network.sessionManagerAddress,
-            [
-                "function getSessionById(uint256 sessionId) view returns (tuple(address owner, uint256 balance))"
-            ],
-            this.provider
-        ); 
-
+        
         this.nodeId = namespaceToId(`node.${this.config.node.username}.${this.config.node.nodeName}`);
-        // Initialize IPFS client
-        this.ipfsClient = new IpfsClient(config.ipfs, this.nodeId);
-
-        // Calculate node ID from worker address
         this.models = new Map(this.config.node.models.map(m => [namespaceToId(m.name), m.name]));
     }
 
+    /**
+     * Initialize wallet with private key from keystore
+     */
+    private async initializeWallet(): Promise<void> {
+        try {
+            const privateKey = await keystoreManager.loadPrivateKey(this.config.keys.workerPrivateKey);
+            this.wallet = new ethers.Wallet(privateKey, this.provider);
+
+            this.logger.info(`ResponseGenerator: Initializing router contract with address ${this.config.network.routerAddress}`);
+            this.logger.info(`ResponseGenerator: Using worker address ${this.wallet.address}`);
+
+            // Initialize router contract
+            const contractRaw = new ethers.Contract(
+                this.config.network.routerAddress,
+                [
+                    "function respondToRequest(bytes32 requestId, uint8 status, string message, bytes response, bytes32 nodeId, uint256 requestSize, uint256 responseSize) external"
+                ],
+                this.wallet
+            );
+            this.routerContract = contractRaw;
+
+            // Initialize session manager contract for balance checks
+            this.sessionManagerContract = new ethers.Contract(
+                this.config.network.sessionManagerAddress,
+                [
+                    "function getSessionById(uint256 sessionId) view returns (tuple(address owner, uint256 balance))"
+                ],
+                this.provider
+            ); 
+
+            // Initialize IPFS client
+            this.ipfsClient = new IpfsClient(this.config.ipfs, this.nodeId!);
+        } catch (error) {
+            throw new Error(`Failed to initialize wallet: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+    }
+
     async generateResponse(requestId: string, request: RouterRequest) {
+        // Ensure wallet is initialized before processing
+        if (!this.wallet) {
+            await this.initializeWallet();
+        }
+        
         if (!this.provider || !this.wallet || !this.routerContract || !this.nodeId || !this.ipfsClient) {
             throw new Error("ResponseGenerator not properly initialized");
         }

@@ -8,6 +8,9 @@ RUN apk add --no-cache \
     g++ \
     git
 
+# Install foundry-keystore-cli globally
+RUN npm install -g foundry-keystore-cli
+
 # Set working directory
 WORKDIR /app
 

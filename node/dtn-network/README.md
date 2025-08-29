@@ -11,10 +11,19 @@ npm install
 bun install
 ```
 
-2. Set up your environment variables in a `.env` file or export them:
+2. Set up your foundry keystore with private keys:
 ```bash
-export OWNER_PRIVATE_KEY="your_owner_private_key"
-export WORKER_PRIVATE_KEY="your_worker_private_key"
+# Install foundry-keystore-cli (if not already installed)
+npm install -g foundry-keystore-cli
+
+# Create and store your private keys in the keystore
+cckey create --keys-path ~/.foundry/keystores --name owner-key --password "your-secure-passphrase"
+cckey create --keys-path ~/.foundry/keystores --name worker-key --password "your-secure-passphrase"
+
+# Set environment variables for keystore access
+export FOUNDRY_KEYSTORE_PASSPHRASE="your-secure-passphrase"
+# Optional: Set custom keystore path (defaults to ~/.foundry/keystores)
+export FOUNDRY_KEYSTORE_PATH="/path/to/your/keystore"
 ```
 
 3. Configure your node by editing `nodeConfig.yaml`
@@ -84,14 +93,106 @@ The CLI uses a YAML configuration file (`nodeConfig.yaml` by default) that defin
 - Model configurations
 - IPFS settings
 - Local cache directory
+- Keystore key names for private key references
+
+The configuration file references keystore key names (e.g., `owner-key`, `worker-key`) instead of environment variables for enhanced security.
 
 See `nodeConfig.yaml` for a complete example.
 
 ## Environment Variables
 
-Required environment variables (referenced in config):
-- `OWNER_PRIVATE_KEY`: Private key for node owner operations
-- `WORKER_PRIVATE_KEY`: Private key for worker operations
+Required environment variables for keystore access:
+- `FOUNDRY_KEYSTORE_PASSPHRASE`: Passphrase to decrypt keys from the foundry keystore
+- `FOUNDRY_KEYSTORE_PATH`: (Optional) Custom path to keystore directory (defaults to `~/.foundry/keystores`)
+
+## Keystore Management
+
+The application uses foundry-keystore-cli (cckey) for secure private key management. Key operations:
+
+```bash
+# List available keys
+cckey list --keys-path ~/.foundry/keystores
+
+# Create a new key
+cckey create --keys-path ~/.foundry/keystores --name my-key --password "secure-passphrase"
+
+# Export a key (for backup)
+cckey export --keys-path ~/.foundry/keystores --name my-key --password "secure-passphrase"
+
+# Import an existing key
+cckey import-raw --keys-path ~/.foundry/keystores --name my-key --private-key "0x..." --password "secure-passphrase"
+```
+
+Ensure your keystore contains keys with names matching those specified in your `nodeConfig.yaml` file.
+
+## Docker-Only Usage (No npm required)
+
+If you prefer to use only Docker without installing npm locally, you can manage keys using the provided `keystore.sh` script:
+
+### Setup with Docker
+
+1. **Build the Docker image:**
+   ```bash
+   ./scripts/build.sh
+   ```
+
+2. **Set up environment variables:**
+   ```bash
+   export FOUNDRY_KEYSTORE_PASSPHRASE="your-secure-passphrase"
+   ```
+
+3. **Manage keys using the keystore script:**
+   ```bash
+   # Create keys for your node (returns the generated address)
+   ./keystore.sh --keys-path /app/keystore/keystore.db create --passphrase "your-passphrase"
+   
+   # List all keys
+   ./keystore.sh --keys-path /app/keystore/keystore.db list
+   
+   # Export a key (for backup) - use the address from create/list
+   ./keystore.sh --keys-path /app/keystore/keystore.db export --address "ccc..." --passphrase "your-passphrase"
+   
+   # Import an existing private key
+   ./keystore.sh --keys-path /app/keystore/keystore.db import-raw 0x1234567890abcdef... --passphrase "your-passphrase"
+   
+   # Delete a key - use the address
+   ./keystore.sh --keys-path /app/keystore/keystore.db delete --address "ccc..."
+   ```
+
+4. **Run the node using Docker Compose:**
+   ```bash
+   # Start the node
+   docker-compose up -d
+   
+   # View logs
+   docker-compose logs -f
+   
+   # Stop the node
+   docker-compose down
+   ```
+
+### Keystore Script Commands
+
+The `keystore.sh` script is a simple wrapper that passes all arguments directly to `cckey` running in Docker:
+
+- `./keystore.sh [options] command [command-options]` - All cckey commands are supported
+- `./keystore.sh help` - Show help information
+- Use `--keys-path /app/keystore/keystore.db` to specify the keystore file location
+
+Common examples:
+- Create key: `./keystore.sh --keys-path /app/keystore/keystore.db create --passphrase "pass"`
+- List keys: `./keystore.sh --keys-path /app/keystore/keystore.db list`
+- Export key: `./keystore.sh --keys-path /app/keystore/keystore.db export --address "ccc..." --passphrase "pass"`
+
+The keystore directory (`./keystore`) is shared between the host and Docker container, so keys persist across container restarts.
+
+### Alternative: Using npm script
+
+If you have npm installed, you can also use:
+```bash
+npm run keystore -- --keys-path /app/keystore/keystore.db create --passphrase "pass"
+npm run keystore -- --keys-path /app/keystore/keystore.db list
+```
 
 ## Error Handling
 

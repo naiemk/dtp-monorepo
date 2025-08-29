@@ -5,13 +5,13 @@ services:
     container_name: dtn-network
     environment:
       - NODE_ENV=production
-      - OWNER_PRIVATE_KEY=${OWNER_PRIVATE_KEY}
-      - WORKER_PRIVATE_KEY=${WORKER_PRIVATE_KEY}
+      - FOUNDRY_KEYSTORE_PASSPHRASE=${FOUNDRY_KEYSTORE_PASSPHRASE}
     volumes:
       # Mount config file if needed
       - ./dtn-network.yaml:/app/nodeConfig.yaml:ro
       # Mount cache directory for persistence
       - dtn-cache:/app/cache
+      - .keystore:/app/keystore
     restart: unless-stopped
     networks:
       - dtn-network

@@ -5,45 +5,61 @@ dtn-network:
   docker-image: "dtn-network-node:latest"
 
   keys:
-    ownerPrivateKey: "OWNER_PRIVATE_KEY_ENV_VAR_NAME"
-    workerPrivateKey: "WORKER_PRIVATE_KEY_ENV_VAR_NAME"
+    ownerPrivateKey: cccq8xqchc5taeul377wvynshh2awxp2n2nkynvc4vw # Replace with actual address from keystore
+    workerPrivateKey: cccq8xqchc5taeul377wvynshh2awxp2n2nkynvc4vw # Replace with actual address from keystore
 
   network:
-    rpcUrl: "https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID"
-    chainId: 11155111
-    nodeManagerAddress: "0x..."
-    modelManagerAddress: "0x..."
-    routerAddress: "0x..."
+    rpcUrl: "BASE_RPC_URL"
+    chainId: 8453
+    nodeManagerAddress: "0xa579c301bB320276b85Ec12C6693eCf9f493146B"
+    modelManagerAddress: "0x27d0BAEcb181c3bB1B5850049092D40eE7b1fE3d"
+    namespaceManagerAddress: "0xe436F8B73cEb51C62eFDf6d8aab0F1c27F083EF1"
+    routerAddress: "0x45B80f551646fDaC777A4991FbdA748Fc5A72194"
+    sessionManagerAddress: "0x8aaEb07881eb18183fFE98afF10b55f8e7318536"
 
   # IPFS Configuration using Pinata
   ipfs:
-    apiKey: "YOUR_PINATA_API_KEY"
-    secretKey: "YOUR_PINATA_SECRET_KEY"
+    pinataJwt: "PINATA_JWT_TOKEN"
     gateway: "https://gateway.pinata.cloud" # Optional, defaults to Pinata gateway
+    
+  # modelApis:
+  #   "openai":
+  #     specs: "https://platform.openai.com/docs/api-reference"
+  #     docs: "OpenAI API documentation"
 
-  modelApis:
-    "openai":
-      specs: "https://platform.openai.com/docs/api-reference"
-      docs: "OpenAI API documentation"
-
-  customModels:
-    - name: "gpt-4"
-      api: "openai"
+  # customModels:
+  #   - name: "gpt-4"
+  #     api: "openai"
 
   node:
-    username: "your-username"
-    nodeName: "your-node-name"
-    worker: "0x..." # Your worker address
+    username: author1
+    nodeName: node1
+    worker: "0x08569906Bd2f01918055aED428a03F3467f6Ca2f"
+    models:
+      - name: model.system.openai-gpt-5
+        priceMinPerByteIn: 10
+        priceMinPerByteOut: 10
+        #host: "http://dtn-openai-proxy:8026/"
+        host: "http://0.0.0.0:8026/"
+      - name: model.system.openai-gpt-5-mini
+        priceMinPerByteIn: 5
+        priceMinPerByteOut: 5
+        #host: "http://dtn-openai-proxy:8026/"
+        host: "http://0.0.0.0:8026/"
+      - name: model.system.openai-gpt-5-nano
+        priceMinPerByteIn: 2
+        priceMinPerByteOut: 2
+        #host: "http://dtn-openai-proxy:8026/"
+        host: "http://0.0.0.0:8026/"
+      - name: model.system.openai-gpt-image-1
+        priceMinPerByteIn: 1
+        priceMinPerByteOut: 1 # 20c per 1024 x 1024 image
+        #host: "http://dtn-openai-proxy:8026/"
+        host: "http://0.0.0.0:8026/"
 
-  models:
-    - name: "gpt-4"
-      priceMinPerByteIn: 0.000001
-      priceMaxPerByteOut: 0.000002
-      host: "https://api.openai.com"
-
-  trustNamespaces:
-    - "trust.system"
-    - "node.system"
+  # trustNamespaces:
+  #   - "trust.system"
+  #   - "node.system"
 
   maxLookBackRequests: 10
 
@@ -53,10 +69,16 @@ dtn-ai-sidecars:
       envs:
         OPENAI_API_KEY: "YOUR_OPENAI_API_KEY_ENV_VAR_NAME"
       models:
-        - model: "model.system.openai-gpt-o3-simpletext"
+          # model api: api.system.llm-simpletext: string[] -> string
+        - model: "model.system.openai-gpt-5"
+          processor: "processor_gpt_o3"
+        - model: "model.system.openai-gpt-5-mini"
+          processor: "processor_gpt_o3"
+        - model: "model.system.openai-gpt-5-nano"
           processor: "processor_gpt_o3"
         
-        - model: "model.system.openai-gpt-o3-simpleimage"
-          processor: "processor_gpt_o3"
+        # model api: api.system.llm-simpleimage: string[], uint64, uint64 -> bytes
+        - model: "model.system.openai-gpt-image-1"
+          processor: "processor_gpt_o3"      
       docker-image:
         "dtn-openai-proxy:latest"

@@ -30,7 +30,8 @@
     "docker:build": "./scripts/build.sh",
     "docker:test": "./scripts/test.sh",
     "docker:all": "bun run docker:build && bun run docker:test",
-    "docker:clean": "docker rm -f dtn-node-test 2>/dev/null || true && docker rmi dtn-network-node:latest 2>/dev/null || true && rm -f test-config.yaml 2>/dev/null || true"
+    "docker:clean": "docker rm -f dtn-node-test 2>/dev/null || true && docker rmi dtn-network-node:latest 2>/dev/null || true && rm -f test-config.yaml 2>/dev/null || true",
+    "keystore": "./keystore.sh"
   },
   "dependencies": {
     "axios": "^1.10.0",
@@ -38,6 +39,7 @@
     "dotenv": "^17.2.0",
     "ethers": "^6.14.4",
     "fs": "^0.0.1-security",
+    "pinata": "^1.3.1",
     "yaml": "^2.8.0"
   }
 }

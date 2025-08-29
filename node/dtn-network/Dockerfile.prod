@@ -31,8 +31,10 @@ COPY src/nodeConfig.yaml ./nodeConfig.yaml
 # Production stage
 FROM oven/bun:1-alpine AS production
 
-# Install runtime dependencies only
-RUN apk add --no-cache dumb-init
+# Install runtime dependencies and foundry-keystore-cli
+RUN apk add --no-cache dumb-init && \
+    bun add -g foundry-keystore-cli && \
+    chmod +x /usr/local/bin/cckey
 
 # Create a non-root user
 RUN addgroup -g 1001 -S nodejs
@@ -41,12 +43,18 @@ RUN adduser -S nodejs -u 1001
 # Set working directory
 WORKDIR /app
 
-# Copy built application from builder stage
+# Ensure the nodejs user can access the globally installed packages
+ENV PATH="/root/.bun/bin:$PATH"
+# Give nodejs user access to root's bun directory
+RUN chmod -R 755 /root/.bun
+
+# Copy built application and dependencies from builder stage
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nodejs:nodejs /app/nodeConfig.yaml ./nodeConfig.yaml
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
 
-# Switch to non-root user
-USER nodejs
+# Keep running as root for keystore CLI access
+# USER nodejs
 
 # Set environment variables
 ENV NODE_ENV=production

@@ -2,6 +2,7 @@ import fs from 'fs';
 import yaml from 'yaml';
 import { ethers, ZeroAddress } from 'ethers';
 import type { NodeConfig, ModelApiConfig, CustomModelConfig } from '../types';
+import { keystoreManager } from '../keystore';
 
 /**
  * This script is used to configure a node for the dtn network.
@@ -31,15 +32,23 @@ const MODEL_MANAGER_ABI = [
     "function modelExists(bytes32 modelId) external view returns (bool)"
 ];
 
-function loadConfig(configPath: string): NodeConfig {
+async function loadConfig(configPath: string): Promise<NodeConfig> {
     const config = fs.readFileSync(configPath, 'utf8');
     const configObj = yaml.parse(config);
-    configObj.keys.ownerPrivateKey = process.env[configObj.keys.ownerPrivateKey];
-    configObj.keys.workerPrivateKey = process.env[configObj.keys.workerPrivateKey];
-
-    if (!configObj.keys.workerPrivateKey) {
-        throw new Error('WORKER_PRIVATE_KEY is not set. Make sure to include the environment variable in the config file.');
+    
+    // Load private keys from keystore instead of environment variables
+    try {
+        if (configObj.keys.ownerPrivateKey && configObj.keys.ownerPrivateKey.trim() !== '') {
+            configObj.keys.ownerPrivateKey = await keystoreManager.loadPrivateKey(configObj.keys.ownerPrivateKey);
+        } else {
+            configObj.keys.ownerPrivateKey = null;
+        }
+        
+        configObj.keys.workerPrivateKey = await keystoreManager.loadPrivateKey(configObj.keys.workerPrivateKey);
+    } catch (error) {
+        throw new Error(`Failed to load private keys from keystore: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+
     return configObj;
 }
 
@@ -233,7 +242,7 @@ async function setNodeModelsIfNotSet(ownerWallet: ethers.Wallet, nodeId: string,
 }
 
 export async function configureNode(configPath: string) {
-    const config = loadConfig(configPath);
+    const config = await loadConfig(configPath);
     const provider = new ethers.JsonRpcProvider(config.network.rpcUrl);
     const { ownerPrivateKey, workerPrivateKey } = config.keys;
     const ownerWallet = ownerPrivateKey ? new ethers.Wallet(ownerPrivateKey, provider) : null;

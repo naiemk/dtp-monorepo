@@ -8,14 +8,16 @@ services:
     container_name: dtn-node
     environment:
       - NODE_ENV=production
-      # Add your environment variables here
-      # - OWNER_PRIVATE_KEY=${OWNER_PRIVATE_KEY}
-      # - WORKER_PRIVATE_KEY=${WORKER_PRIVATE_KEY}
+      # Keystore configuration
+      - FOUNDRY_KEYSTORE_PASSPHRASE=${FOUNDRY_KEYSTORE_PASSPHRASE}
+      - FOUNDRY_KEYSTORE_PATH=/app/keystore
     volumes:
       # Mount config file if needed
       - ./nodeConfig.yaml:/app/nodeConfig.yaml:ro
       # Mount cache directory for persistence
       - dtn-cache:/app/cache
+      # Mount keystore directory for key management
+      - ./keystore:/app/keystore
     restart: unless-stopped
     # Uncomment if you need to expose ports
     # ports:
