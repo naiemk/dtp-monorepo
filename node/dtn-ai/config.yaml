@@ -13,7 +13,11 @@ models:
   # model api: api.system.llm-simpleimage: string[], uint64, uint64 -> bytes
   - model: "model.system.openai-gpt-image-1"
     processor: "processor_gpt_o3"
-  
+
   # Add more models as needed
-  # - model: "model.system.another-model"
-  #   processor: "processor_another" 
+  - model: "model.system.google-gemini-2_5-pro"
+    processor: "processor_gemini"
+  - model: "model.system.google-gemini-2_5-flash"
+    processor: "processor_gemini"
+  - model: "model.system.google-gemini-2_5-flash-lite"
+    processor: "processor_gemini"
