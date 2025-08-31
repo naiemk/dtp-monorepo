@@ -12,9 +12,11 @@ def test_gemini_with_api_key():
         print("export GOOGLE_API_KEY='your-api-key'")
         return
 
+    model = "model.system.google-gemini-1_5-flash"
+
     result, result_type = execute_call(
-        "model.system.google-gemini-2_5-flash",
-        ["Find a recent news headline about space exploration and cite the source URL."],
+        model,
+        ["What is the latest BITCOIN price and at what time? Return only the price and time in the following format: [price, time]"],
         ["string"],
     )
     print("Result type:", result_type)
