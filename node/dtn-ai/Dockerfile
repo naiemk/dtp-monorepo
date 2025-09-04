@@ -40,8 +40,7 @@ RUN addgroup -g 1000 dtn && \
 WORKDIR /app
 
 # Copy application files
-COPY --chown=dtn:dtn server.py .
-COPY --chown=dtn:dtn processor_gpt_o3.py .
+COPY --chown=dtn:dtn *.py .
 COPY --chown=dtn:dtn config.yaml .
 
 # Switch to non-root user
