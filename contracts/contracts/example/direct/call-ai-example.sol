@@ -43,9 +43,9 @@ contract CallAiExample is WithDtnAi {
                 call: abi.encode(prompt_lines),
                 extraParams: extraParamsEncoded,
                 calltype: IDtnAi.CallType.DIRECT, 
-                feePerByteReq: 0.001 * 10**18,
-                feePerByteRes: 0.001 * 10**18,
-                totalFeePerRes: 1 * 10**18
+                feePerByteReq: 5, // USDC has 6 digits
+                feePerByteRes: 5,
+                totalFeePerRes: 1000000 // 1 USDC
             }),
             IDtnAi.CallBack(
                 this.callback.selector,
@@ -72,9 +72,9 @@ contract CallAiExample is WithDtnAi {
                 call: abi.encode(prompt_lines, width, height),
                 extraParams: extraParamsEncoded,
                 calltype: IDtnAi.CallType.IPFS, 
-                feePerByteReq: 0.001 * 10**18,
-                feePerByteRes: 0.001 * 10**18,
-                totalFeePerRes: 1 * 10**18
+                feePerByteReq: 1, // USDC has 6 digits
+                feePerByteRes: 1,
+                totalFeePerRes: 1000000 // 1 USDC
             }),
             IDtnAi.CallBack(
                 this.callbackIpfs.selector,

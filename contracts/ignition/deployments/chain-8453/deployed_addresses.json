@@ -20,5 +20,7 @@
   "UpgradeSessionManager#router": "0x45B80f551646fDaC777A4991FbdA748Fc5A72194",
   "UpgradeSessionManager#sessionManagerImpl2": "0x5f7B6585048a6466c3cDd05515639E96e58DC14C",
   "UpgradeSessionManager#sessionManagerProxyNewVersionUpgradeable": "0xB93f4869C36beF19C610c32e2596C1abb8Fa878d",
-  "UpgradeSessionManager#sessionManagerTmp1": "0xB93f4869C36beF19C610c32e2596C1abb8Fa878d"
+  "UpgradeSessionManager#sessionManagerTmp1": "0xB93f4869C36beF19C610c32e2596C1abb8Fa878d",
+  "DeployCallAi#callAiExample_5": "0xDE842a7158584E33Af590617675f2a4052B57189",
+  "DeployCallAi#callAiExample_6": "0x4B39f8056bA153c7Be2DAEfBF31553B85c3f26E2"
 }

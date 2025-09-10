@@ -3,32 +3,18 @@
 import { Command } from 'commander';
 import yaml from 'yaml';
 import fs from 'fs';
+
+import './envConfig';
 import { DtnService } from './dtnService';
 import { RequestReader } from './requestReader';
 import { ResponseGenerator } from './responseGenerator';
 import { RequestParser } from './RequestParser';
 import { configureNode } from './scripts/confiureNode';
 import type { NodeConfig } from './types';
-import dotenv from 'dotenv';
 import { Logger, LogLevel } from './logger';
 import { keystoreManager } from './keystore';
 
 // Load environment variables from multiple possible config files
-const envFiles = ['.env', '.env.production', 'localConfig/.env'];
-let envLoaded = false;
-
-for (const envFile of envFiles) {
-    if (fs.existsSync(envFile)) {
-        dotenv.config({ path: envFile });
-        console.log(`📄 Loaded environment from: ${envFile}`);
-        envLoaded = true;
-        break;
-    }
-}
-
-if (!envLoaded) {
-    console.warn('⚠️  No environment file found. Tried:', envFiles.join(', '));
-}
 
 const program = new Command();
 

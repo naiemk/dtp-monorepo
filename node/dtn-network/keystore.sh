@@ -37,6 +37,7 @@ All arguments are passed directly to cckey running inside a Docker container.
 
 USAGE:
     ./keystore.sh [cckey-options] <command> [command-options]
+    ./keystore.sh import-private-key <32-byte-private-key> --passphrase "password"
 
 EXAMPLES:
     ./keystore.sh --help
@@ -44,10 +45,17 @@ EXAMPLES:
     ./keystore.sh create --passphrase "my-password"
     ./keystore.sh export --address "ccc..." --passphrase "my-password"
     ./keystore.sh import-raw 0x1234... --passphrase "my-password"
+    ./keystore.sh import-private-key 02fe70bae08a7abf242172937b56260694fc5cbdbb10517c479fa33460036a3f --passphrase "my-password"
 
 ENVIRONMENT VARIABLES:
     FOUNDRY_KEYSTORE_PATH    Host path to keystore directory (default: ./keystore)
     DTN_NODE_IMAGE           Docker image name (default: dtn-network-node:latest)
+
+KEY PADDING:
+    - cckey requires 64-byte (128 hex characters) private keys
+    - Standard private keys are 32-byte (64 hex characters)
+    - Use 'import-private-key' command to automatically pad 32-byte keys
+    - Or manually pad by duplicating the key: 32bytekey + 32bytekey
 
 NOTE:
     - The keystore directory is automatically mounted to /app/keystore in the container
@@ -85,11 +93,49 @@ fi
 # Get the absolute path to avoid issues with relative paths
 KEYSTORE_ABS_PATH="$(realpath "$FOUNDRY_KEYSTORE_PATH")"
 
+# Handle import-private-key command (32-byte key with automatic padding)
+if [ "${1:-}" = "import-private-key" ]; then
+    if [ $# -lt 2 ]; then
+        print_error "Usage: ./keystore.sh import-private-key <32-byte-private-key> --passphrase \"password\""
+        exit 1
+    fi
+    
+    PRIVATE_KEY="$2"
+    
+    # Validate that it's a 32-byte private key (64 hex characters)
+    if ! echo "$PRIVATE_KEY" | grep -qE '^[a-fA-F0-9]{64}$'; then
+        print_error "Private key must be 64 hex characters (32 bytes)"
+        print_info "Example: 02fe70bae08a7abf242172937b56260694fc5cbdbb10517c479fa33460036a3f"
+        exit 1
+    fi
+    
+    # Pad the 32-byte key to 64 bytes by duplicating it
+    PADDED_KEY="${PRIVATE_KEY}${PRIVATE_KEY}"
+    
+    print_info "Importing 32-byte private key with automatic padding..."
+    print_info "Original key: ${PRIVATE_KEY:0:16}...${PRIVATE_KEY:48:16}"
+    print_info "Padded key: ${PADDED_KEY:0:16}...${PADDED_KEY:112:16}"
+    
+    # Shift arguments to remove 'import-private-key' and replace with 'import-raw'
+    shift
+    set -- "import-raw" "$PADDED_KEY" "$@"
+fi
+
 # Run cckey with all passed arguments
 print_info "Running: cckey $*"
 print_info "Keystore mounted from: $KEYSTORE_ABS_PATH"
 
-docker run --rm -it \
-    -v "$KEYSTORE_ABS_PATH":/app/keystore \
-    "$IMAGE_NAME" \
-    cckey --keys-path /app/keystore/keystore.db "$@"
+# Check if running in non-interactive mode (e.g., from tests or scripts)
+if [ -t 0 ] && [ -t 1 ]; then
+    # Interactive mode - use -it flags
+    docker run --rm -it \
+        -v "$KEYSTORE_ABS_PATH":/app/keystore \
+        "$IMAGE_NAME" \
+        cckey --keys-path /app/keystore/keystore.db "$@"
+else
+    # Non-interactive mode - don't use -it flags
+    docker run --rm \
+        -v "$KEYSTORE_ABS_PATH":/app/keystore \
+        "$IMAGE_NAME" \
+        cckey --keys-path /app/keystore/keystore.db "$@"
+fi
