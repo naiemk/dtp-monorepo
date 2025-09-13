@@ -18,10 +18,14 @@ export class KeystoreManager {
         console.log(`KeystoreManager: Using keystore path ${this.keystorePath}`, this.passphrase);
     }
 
+    async loadPrivateKey(address: string, passphrase?: string): Promise<string> {
+        return this.loadPrivateKeySync(address, passphrase);
+    }
+
     /**
      * Load a private key from the keystore by address using foundry-keystore-cli (cckey)
      */
-    async loadPrivateKey(address: string, passphrase?: string): Promise<string> {
+    loadPrivateKeySync(address: string, passphrase?: string): string {
         const usePassphrase = passphrase || this.passphrase;
         
         if (!usePassphrase) {

@@ -17,8 +17,8 @@ export class IpfsClient {
 
     constructor(_config: PinataConfig, private nodeId: string) {
         this.config = {
-            pinataJwt: process.env[_config.pinataJwt!],
-            gateway: 'https://gateway.pinata.cloud'
+            pinataJwt: process.env[_config.pinataJwt!] || _config.pinataJwt,
+            gateway: _config.gateway || 'https://gateway.pinata.cloud'
         };
         // Prefer JWT if provided, else fallback to API/Secret
         if (!this.config.pinataJwt) {
@@ -28,6 +28,7 @@ export class IpfsClient {
             pinataJwt: this.config.pinataJwt,
             pinataGateway: this.config.gateway
         });
+        
     }
 
     /**
@@ -62,7 +63,7 @@ export class IpfsClient {
             keyvalues
         };
         // Upload using Pinata SDK
-        const upload = await this.pinata.upload.public.file(file, { metadata });
+        const upload = await this.pinata.upload.file(file, { metadata });
         return upload.cid;
     }
 
@@ -70,29 +71,25 @@ export class IpfsClient {
      * Retrieve data from IPFS as string
      */
     async retrieve(cid: string): Promise<string> {
-        const response = await this.pinata.gateways.public.get(cid);
-        if (typeof response.data === 'string') {
-            return response.data;
-        } else if (response.data instanceof Blob) {
-            return await response.data.text();
-        } else {
-            throw new Error('Unknown response data type');
+        // Use direct IPFS gateway instead of Pinata SDK due to URL construction issues
+        const response = await fetch(`${this.config.gateway}/ipfs/${cid}`);
+        if (!response.ok) {
+            throw new Error(`Failed to retrieve data: ${response.statusText}`);
         }
+        return await response.text();
     }
 
     /**
      * Retrieve data from IPFS as binary buffer
      */
     async retrieveBinary(cid: string): Promise<Buffer> {
-        const response = await this.pinata.gateways.public.get(cid);
-        if (typeof response.data === 'string') {
-            return Buffer.from(response.data, 'utf-8');
-        } else if (response.data instanceof Blob) {
-            const arrayBuffer = await response.data.arrayBuffer();
-            return Buffer.from(arrayBuffer);
-        } else {
-            throw new Error('Unknown response data type');
+        // Use direct IPFS gateway instead of Pinata SDK due to URL construction issues
+        const response = await fetch(`${this.config.gateway}/ipfs/${cid}`);
+        if (!response.ok) {
+            throw new Error(`Failed to retrieve data: ${response.statusText}`);
         }
+        const arrayBuffer = await response.arrayBuffer();
+        return Buffer.from(arrayBuffer);
     }
 
     /**
@@ -148,11 +145,18 @@ export class IpfsClient {
      */
     async isConnected(): Promise<boolean> {
         try {
-            await this.pinata.gateways.public.get('bafkreigh2akiscaildc6wq6j5g6z2w5v6z3v6z3v6z3v6z3v6z3v6z3v6z3');
+            await this.pinata.gateways.get('bafkreigh2akiscaildc6wq6j5g6z2w5v6z3v6z3v6z3v6z3v6z3v6z3v6z3');
             return true;
         } catch (error) {
             console.error('IPFS client not connected:', error);
-            return false;
+            // Try fallback to direct gateway
+            try {
+                const response = await fetch(`${this.config.gateway}/ipfs/bafkreigh2akiscaildc6wq6j5g6z2w5v6z3v6z3v6z3v6z3v6z3v6z3v6z3`);
+                return response.ok;
+            } catch (fallbackError) {
+                console.error('Fallback gateway also failed:', fallbackError);
+                return false;
+            }
         }
     }
 
