@@ -62,8 +62,8 @@ export class IpfsClient {
             name: options.filename || `dtn-data-${Date.now()}`,
             keyvalues
         };
-        // Upload using Pinata SDK
-        const upload = await this.pinata.upload.file(file, { metadata });
+        // Upload using Pinata SDK to public gateway
+        const upload = await this.pinata.upload.public.file(file, { metadata });
         return upload.cid;
     }
 
@@ -71,25 +71,78 @@ export class IpfsClient {
      * Retrieve data from IPFS as string
      */
     async retrieve(cid: string): Promise<string> {
-        // Use direct IPFS gateway instead of Pinata SDK due to URL construction issues
-        const response = await fetch(`${this.config.gateway}/ipfs/${cid}`);
-        if (!response.ok) {
-            throw new Error(`Failed to retrieve data: ${response.statusText}`);
+        try {
+            // Try Pinata SDK public gateway first
+            const response = await this.pinata.gateways.public.get(cid);
+            if (typeof response.data === 'string') {
+                return response.data;
+            } else if (response.data instanceof Blob) {
+                return await response.data.text();
+            } else {
+                throw new Error('Unknown response data type');
+            }
+        } catch (error) {
+            // Fallback to other public IPFS gateways
+            const gateways = [
+                'https://ipfs.io',
+                'https://cloudflare-ipfs.com',
+                'https://dweb.link',
+                this.config.gateway
+            ];
+            
+            for (const gateway of gateways) {
+                try {
+                    const response = await fetch(`${gateway}/ipfs/${cid}`);
+                    if (response.ok) {
+                        return await response.text();
+                    }
+                } catch (gatewayError) {
+                    continue;
+                }
+            }
+            
+            throw new Error(`Failed to retrieve data from any public gateway`);
         }
-        return await response.text();
     }
 
     /**
      * Retrieve data from IPFS as binary buffer
      */
     async retrieveBinary(cid: string): Promise<Buffer> {
-        // Use direct IPFS gateway instead of Pinata SDK due to URL construction issues
-        const response = await fetch(`${this.config.gateway}/ipfs/${cid}`);
-        if (!response.ok) {
-            throw new Error(`Failed to retrieve data: ${response.statusText}`);
+        try {
+            // Try Pinata SDK public gateway first
+            const response = await this.pinata.gateways.public.get(cid);
+            if (typeof response.data === 'string') {
+                return Buffer.from(response.data, 'utf-8');
+            } else if (response.data instanceof Blob) {
+                const arrayBuffer = await response.data.arrayBuffer();
+                return Buffer.from(arrayBuffer);
+            } else {
+                throw new Error('Unknown response data type');
+            }
+        } catch (error) {
+            // Fallback to other public IPFS gateways
+            const gateways = [
+                'https://ipfs.io',
+                'https://cloudflare-ipfs.com',
+                'https://dweb.link',
+                this.config.gateway
+            ];
+            
+            for (const gateway of gateways) {
+                try {
+                    const response = await fetch(`${gateway}/ipfs/${cid}`);
+                    if (response.ok) {
+                        const arrayBuffer = await response.arrayBuffer();
+                        return Buffer.from(arrayBuffer);
+                    }
+                } catch (gatewayError) {
+                    continue;
+                }
+            }
+            
+            throw new Error(`Failed to retrieve binary data from any public gateway`);
         }
-        const arrayBuffer = await response.arrayBuffer();
-        return Buffer.from(arrayBuffer);
     }
 
     /**
@@ -145,7 +198,7 @@ export class IpfsClient {
      */
     async isConnected(): Promise<boolean> {
         try {
-            await this.pinata.gateways.get('bafkreigh2akiscaildc6wq6j5g6z2w5v6z3v6z3v6z3v6z3v6z3v6z3v6z3');
+            await this.pinata.gateways.public.get('bafkreigh2akiscaildc6wq6j5g6z2w5v6z3v6z3v6z3v6z3v6z3v6z3v6z3');
             return true;
         } catch (error) {
             console.error('IPFS client not connected:', error);
