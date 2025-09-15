@@ -3,13 +3,9 @@ Handles text generation requests for Google Gemini models with search grounding.
 
 import logging
 import os
+from google import genai
+from google.genai import types
 from typing import List, Tuple, Any, Optional
-
-# Use the standard import
-import google.generativeai as genai
-
-# ONLY import Tool from google.generativeai.types
-from google.generativeai.types import Tool
 from google.api_core.exceptions import GoogleAPIError
 
 logger = logging.getLogger(__name__)
@@ -55,26 +51,44 @@ def _handle_text_generation(parameters: List[Any], model: str, types: List[str])
 
     try:
         model_name = _translate_model_name(model)
-        gemini_model = genai.GenerativeModel(
-            model_name=model_name
-        )
-
-        # The definitive, correct way to enable Google Search
-        search_tool = Tool(google_search_retrieval={})
-        tools = [search_tool] if "1.5" in model_name else [] # 2.5 does not support search yet
-        
-        response = gemini_model.generate_content(
-            contents=prompt,
-            tools=tools
-        )
-        
-        generated_text = getattr(response, "text", None)
-        if not generated_text:
+        response = generate(prompt, model_name)
+        if not response:
             raise ApiError("No response generated from Gemini API", "NO_RESPONSE")
-        return generated_text, "string"
+        return response, "string"
     except GoogleAPIError as e:
         logger.error(f"Gemini API error for text generation: {e}")
         raise ApiError(f"Text generation failed: {str(e)}", "TEXT_GENERATION_ERROR")
     except Exception as e:
         logger.error(f"Unexpected error from Gemini: {e}")
         raise ApiError(f"Text generation failed: {str(e)}", "TEXT_GENERATION_ERROR")
+
+def generate(query: str, model: str):
+    client = genai.Client(
+        api_key=os.environ.get("GEMINI_API_KEY"),
+    )
+
+    contents = [
+        types.Content(
+            role="user",
+            parts=[
+                types.Part.from_text(text=query),
+            ],
+        ),
+    ]
+    tools = [
+        types.Tool(url_context=types.UrlContext()),
+        types.Tool(googleSearch=types.GoogleSearch(
+        )),
+    ]
+    generate_content_config = types.GenerateContentConfig(
+        thinking_config = types.ThinkingConfig(
+            thinking_budget=-1,
+        ),
+        tools=tools,
+    )
+
+    return "".join([chunk.text for chunk in client.models.generate_content_stream(
+        model=model,
+        contents=contents,
+        config=generate_content_config,
+    )])

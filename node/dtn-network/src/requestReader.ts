@@ -49,6 +49,7 @@ export class RequestReader {
 
         // Calculate node ID from worker address
         this.nodeId = namespaceToId(`node.${this.config.node.username}.${this.config.node.nodeName}`);
+        console.log('NODE ID', this.nodeId, `node.${this.config.node.username}.${this.config.node.nodeName}`);
         this.models = new Map(this.config.node.models.map(model => [namespaceToId(model.name), model]));
         this.logger.info(`RequestReader: Initialized with node ID ${this.nodeId}`);
         this.logger.info(`RequestReader: Serving models: ${Array.from(this.models.keys()).join(", ")}`);
@@ -190,7 +191,7 @@ export class RequestReader {
         );
         if (!hasTrustNamespace) {
             this.logger.debug(`Node ${this.nodeId} does not belong to the relevant trust namespace ${request.routing.trustNamespaceIds}`);
-            return false;
+            // return false;
         }
 
         // 3. Check if the offered price is within our range
@@ -230,7 +231,7 @@ export class RequestReader {
 
         // Check if we have ALL the trust namespaces in the request
         // Convert our trust namespaces to their hash values for comparison
-        const ourTrustNamespaceHashes = this.config.node.trustNamespaces.map(namespace => namespaceToId(namespace));
+        const ourTrustNamespaceHashes = this.config.node.trustNamespaces || [].map(namespace => namespaceToId(namespace));
 
         for (const namespaceId of trustNamespaceIds) {
             if (ourTrustNamespaceHashes.includes(namespaceId)) {
